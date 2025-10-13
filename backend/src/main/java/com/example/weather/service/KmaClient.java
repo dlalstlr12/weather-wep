@@ -164,6 +164,16 @@ public class KmaClient {
         Map<String, Object> body;
         String url;
 
+        String cacheKey = String.format(Locale.ROOT,
+                "%s|ultra|%d|%d|%s|%s", provider.toLowerCase(Locale.ROOT), grid.nx(), grid.ny(), base.date, base.time);
+
+        CacheEntry ce = cache.get(cacheKey);
+        if (ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> cached = (Map<String, String>) ce.data;
+            return cached;
+        }
+
         if ("hub".equalsIgnoreCase(provider)) {
             // Hub: 일반적으로 key를 헤더(x-api-key)로 전달. 필요 시 query로도 지원
             String query = String.format(Locale.ROOT,
