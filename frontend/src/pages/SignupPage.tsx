@@ -42,6 +42,9 @@ export default function SignupPage() {
 
   return (
     <div className="container small">
+      <div className="chips" style={{ marginBottom: 8 }}>
+        <button className="btn btn-refresh" onClick={() => nav('/')}>메인으로</button>
+      </div>
       <h2>회원가입</h2>
       <form onSubmit={onSubmit} className="form">
         <label>

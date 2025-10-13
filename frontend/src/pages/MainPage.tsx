@@ -50,6 +50,14 @@ export default function MainPage() {
     setNotice('로그아웃되었습니다.')
   }
 
+  const onChat = () => {
+    if (!isAuthenticated()) {
+      setNotice('로그인 후 이용해주세요')
+      return
+    }
+    nav('/chat')
+  }
+
   useEffect(() => {
     const fetchWeather = async () => {
       if (!coords) return
@@ -161,6 +169,7 @@ export default function MainPage() {
         <div className="chips" style={{ alignItems: 'center' }}>
           <button className="btn btn-refresh" onClick={onRefresh}>새로고침</button>
           <button className="btn btn-fav" onClick={addFavorite}>즐겨찾기 추가</button>
+          <button className="btn btn-search" onClick={onChat}>날씨챗</button>
           {isAuthenticated() ? (
             <>
               <span className="chip" style={{ cursor: 'default' }}><b>{userName || '사용자'}</b>님 반갑습니다</span>
