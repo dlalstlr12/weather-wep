@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import ForecastList from '../components/ForecastList'
+import WeatherIcon from '../components/WeatherIcon'
+import DailySummary from '../components/DailySummary'
+import TempChart from '../components/TempChart'
 
 type Coords = { lat: number; lon: number }
 
@@ -11,12 +14,14 @@ export default function MainPage() {
   const [forecast, setForecast] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [locationLabel, setLocationLabel] = useState('')
 
   useEffect(() => {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+        setLocationLabel('현재 위치')
       },
       () => {}
     )
@@ -56,6 +61,7 @@ export default function MainPage() {
       ])
       setWeather(cur)
       setForecast(fc?.items || [])
+      setLocationLabel(city.trim())
     } catch (e) {
       setError('도시의 날씨 정보를 불러오지 못했습니다.')
     } finally {
@@ -66,10 +72,16 @@ export default function MainPage() {
   return (
     <div className="container">
       <header className="header">
-        <h1>날씨</h1>
+        <div className="title">
+          <WeatherIcon sky={weather?.sky || '맑음'} size={28} />
+          <div>
+            <div style={{ fontSize: 20 }}>오늘의 날씨</div>
+            <div className="subtitle">{locationLabel ? `${locationLabel} · ` : ''}현재 조건과 3시간 간격 예보</div>
+          </div>
+        </div>
       </header>
 
-      <section className="actions">
+      <section className="section">
         <form onSubmit={onSearch} className="search">
           <input
             value={city}
@@ -85,9 +97,28 @@ export default function MainPage() {
         {error && <p className="error">{error}</p>}
         {weather && (
           <div className="card">
-            <div>현재 기온: {weather.temperature ?? '-'}°C</div>
-            <div>강수: {weather.precipitation ?? '-'}mm</div>
-            <div>하늘 상태: {weather.sky ?? '-'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <WeatherIcon sky={weather.sky} />
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 700 }}>{weather.temperature ?? '-'}°C</div>
+                <div className="muted">{weather.sky ?? '-'}</div>
+              </div>
+              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                <div className="muted">강수</div>
+                <div style={{ fontWeight: 600 }}>{weather.precipitation ?? '-'} mm</div>
+              </div>
+            </div>
+          </div>
+        )}
+        {forecast && forecast.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h2 style={{ color: '#f8fafc' }}>일일 요약</h2>
+            <DailySummary items={forecast} />
+          </div>
+        )}
+        {forecast && forecast.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <TempChart items={forecast} />
           </div>
         )}
         {forecast && forecast.length > 0 && (
