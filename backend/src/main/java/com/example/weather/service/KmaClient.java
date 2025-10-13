@@ -31,6 +31,11 @@ public class KmaClient {
     private final String hubHeaderName;
     private final String hubQueryName;
 
+    private static final long TTL_MILLIS = 10 * 60 * 1000L;
+    private final java.util.concurrent.ConcurrentHashMap<String, CacheEntry> cache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record CacheEntry(Object data, long ts) {}
+
     public KmaClient(
             @Value("${kma.service-key:}") String serviceKey,
             @Value("${kma.provider:data}") String provider,
@@ -61,6 +66,16 @@ public class KmaClient {
 
         Map<String, Object> body;
         String url;
+
+        String cacheKey = String.format(Locale.ROOT,
+                "%s|vilage|%d|%d|%s|%s", provider.toLowerCase(Locale.ROOT), grid.nx(), grid.ny(), base.date, base.time);
+
+        CacheEntry ce = cache.get(cacheKey);
+        if (ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
+            @SuppressWarnings("unchecked")
+            java.util.List<java.util.Map<String, String>> cached = (java.util.List<java.util.Map<String, String>>) ce.data;
+            return cached;
+        }
 
         if ("hub".equalsIgnoreCase(provider)) {
             String query = String.format(Locale.ROOT,
@@ -136,6 +151,7 @@ public class KmaClient {
             m.put("dateTime", e.getKey());
             out.add(m);
         }
+        cache.put(cacheKey, new CacheEntry(out, System.currentTimeMillis()));
         return out;
     }
     public Map<String, String> getUltraNowcast(double lat, double lon) {
@@ -219,6 +235,7 @@ public class KmaClient {
         } catch (Exception e) {
             throw new RuntimeException("KMA 응답 파싱 실패", e);
         }
+        cache.put(cacheKey, new CacheEntry(result, System.currentTimeMillis()));
         return result;
     }
 
