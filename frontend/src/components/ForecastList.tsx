@@ -10,19 +10,18 @@ type ForecastItem = {
 
 const fmtDate = (dt: string) => {
   if (!dt || dt.length < 8) return dt
-  const m = dt.slice(4, 6)
-  const d = dt.slice(6, 8)
-  return `${m}/${d}`
+  const m = Number(dt.slice(4, 6))
+  const d = Number(dt.slice(6, 8))
+  return `${m}월 ${d}일`
 }
 
 const fmtTime = (dt: string) => {
   if (!dt || dt.length < 10) return dt
-  const hh = dt.slice(8, 10)
-  const mm = dt.slice(10, 12)
-  return `${hh}:${mm}`
+  const hh = Number(dt.slice(8, 10))
+  return `${hh}시`
 }
 
-export default function ForecastList({ items }: { items: ForecastItem[] }) {
+export default function ForecastList({ items, selectedDateTime }: { items: ForecastItem[]; selectedDateTime?: string }) {
   if (!items || items.length === 0) return null
 
   const byDate: Record<string, ForecastItem[]> = {}
@@ -40,24 +39,28 @@ export default function ForecastList({ items }: { items: ForecastItem[] }) {
       {Object.entries(byDate).map(([date, arr]) => (
         <div key={date}>
           <div style={{ color: '#f8fafc', fontWeight: 700, marginBottom: 8 }}>{fmtDate(date)}</div>
-          <div style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(140px, 1fr)', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
-            {arr.map((it, idx) => (
-              <div key={idx} className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div className="muted">{fmtTime(it.dateTime)}</div>
-                  <div style={{ fontWeight: 700 }}>{it.temperature ?? '-'}°C</div>
+          <div className="forecast-scroll" style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(140px, 1fr)', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+            {arr.map((it, idx) => {
+              const sel = selectedDateTime && it.dateTime === selectedDateTime
+              return (
+                <div key={idx} className="card" ref={(el) => { if (sel && el) el.scrollIntoView({ inline: 'center', behavior: 'smooth' }) }}
+                     style={{ outline: sel ? '2px solid #ef4444' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div className="muted">{fmtTime(it.dateTime)}</div>
+                    <div style={{ fontWeight: 700 }}>{it.temperature ?? '-'}°C</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, fontSize: 13 }}>
+                    <div>강수 {it.precipitation ?? '-'}mm</div>
+                    <div>{it.sky ?? '-'}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 12 }}>
+                    <div className="muted">강수확률 {it.pop ?? '-'}%</div>
+                    <div className="muted">습도 {it.reh ?? '-'}%</div>
+                    <div className="muted">풍속 {it.wsd ?? '-'}m/s</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 13 }}>
-                  <div>강수 {it.precipitation ?? '-'}mm</div>
-                  <div>{it.sky ?? '-'}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 12 }}>
-                  <div className="muted">강수확률 {it.pop ?? '-'}%</div>
-                  <div className="muted">습도 {it.reh ?? '-'}%</div>
-                  <div className="muted">풍속 {it.wsd ?? '-'}m/s</div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ))}

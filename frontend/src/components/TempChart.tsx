@@ -10,7 +10,7 @@ export type ForecastItem = {
   wsd?: number | null
 }
 
-export default function TempChart({ items }: { items: ForecastItem[] }) {
+export default function TempChart({ items, onSelect }: { items: ForecastItem[]; onSelect?: (dateTime: string) => void }) {
   const all = useMemo(() => (items || []).filter(it => it.temperature != null), [items])
   const [range, setRange] = useState(12)
   const [selected, setSelected] = useState<number | null>(null)
@@ -133,7 +133,7 @@ export default function TempChart({ items }: { items: ForecastItem[] }) {
             return (
               <g key={i}
                  onMouseEnter={() => setHover(i)}
-                 onClick={() => setSelected(i)}
+                 onClick={() => { setSelected(i); onSelect?.(d.dateTime); }}
                  style={{ cursor: 'pointer' }}>
                 <circle cx={cx} cy={cy} r={active ? 7 : 5} fill={active ? '#ef4444' : '#ffffff'} stroke="#ef4444" strokeWidth={2} />
                 <text x={cx} y={height - 6} textAnchor="middle" fontSize={11} fill="#0f172a">{fmtTime(d.dateTime)}</text>

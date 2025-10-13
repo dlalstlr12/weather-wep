@@ -15,8 +15,14 @@ export default function MainPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [locationLabel, setLocationLabel] = useState('')
+  const [selectedDateTime, setSelectedDateTime] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<string[]>([])
 
   useEffect(() => {
+    const saved = localStorage.getItem('favCities')
+    if (saved) {
+      try { setFavorites(JSON.parse(saved)) } catch {}
+    }
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -39,6 +45,7 @@ export default function MainPage() {
         ])
         setWeather(cur)
         setForecast(fc?.items || [])
+        setSelectedDateTime(null)
       } catch (e) {
         setError('날씨 정보를 불러오지 못했습니다.')
       } finally {
@@ -62,11 +69,63 @@ export default function MainPage() {
       setWeather(cur)
       setForecast(fc?.items || [])
       setLocationLabel(city.trim())
+      setSelectedDateTime(null)
     } catch (e) {
       setError('도시의 날씨 정보를 불러오지 못했습니다.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const onRefresh = async () => {
+    if (loading) return
+    setError('')
+    setLoading(true)
+    try {
+      if (locationLabel && locationLabel !== '현재 위치') {
+        const q = encodeURIComponent(locationLabel)
+        const [cur, fc] = await Promise.all([
+          api(`/api/weather/current?city=${q}&nocache=true`),
+          api(`/api/weather/forecast?city=${q}&nocache=true`)
+        ])
+        setWeather(cur); setForecast(fc?.items || [])
+      } else if (coords) {
+        const [cur, fc] = await Promise.all([
+          api(`/api/weather/current?lat=${coords.lat}&lon=${coords.lon}&nocache=true`),
+          api(`/api/weather/forecast?lat=${coords.lat}&lon=${coords.lon}&nocache=true`)
+        ])
+        setWeather(cur); setForecast(fc?.items || [])
+      }
+      setSelectedDateTime(null)
+    } catch (e) {
+      setError('새로고침에 실패했습니다.')
+    } finally { setLoading(false) }
+  }
+
+  const addFavorite = () => {
+    const name = locationLabel && locationLabel !== '현재 위치' ? locationLabel : city.trim()
+    if (!name) return
+    if (favorites.includes(name)) return
+    const next = [...favorites, name].slice(0, 8)
+    setFavorites(next)
+    localStorage.setItem('favCities', JSON.stringify(next))
+  }
+
+  const selectFavorite = async (name: string) => {
+    setCity(name)
+    setLocationLabel(name)
+    setError('')
+    setLoading(true)
+    try {
+      const q = encodeURIComponent(name)
+      const [cur, fc] = await Promise.all([
+        api(`/api/weather/current?city=${q}`),
+        api(`/api/weather/forecast?city=${q}`)
+      ])
+      setWeather(cur); setForecast(fc?.items || [])
+      setSelectedDateTime(null)
+    } catch (e) { setError('도시의 날씨 정보를 불러오지 못했습니다.') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -79,6 +138,10 @@ export default function MainPage() {
             <div className="subtitle">{locationLabel ? `${locationLabel} · ` : ''}현재 조건과 3시간 간격 예보</div>
           </div>
         </div>
+        <div className="chips">
+          <button onClick={onRefresh}>새로고침</button>
+          <button onClick={addFavorite}>즐겨찾기 추가</button>
+        </div>
       </header>
 
       <section className="section">
@@ -90,6 +153,13 @@ export default function MainPage() {
           />
           <button type="submit">검색</button>
         </form>
+        {favorites.length > 0 && (
+          <div className="chips" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+            {favorites.map((f) => (
+              <span key={f} className="chip" onClick={() => selectFavorite(f)}>{f}</span>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="content">
@@ -118,13 +188,13 @@ export default function MainPage() {
         )}
         {forecast && forecast.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <TempChart items={forecast} />
+            <TempChart items={forecast} onSelect={(dt) => setSelectedDateTime(dt)} />
           </div>
         )}
         {forecast && forecast.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <h2>예보</h2>
-            <ForecastList items={forecast} />
+            <ForecastList items={forecast} selectedDateTime={selectedDateTime || undefined} />
           </div>
         )}
       </section>
