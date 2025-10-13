@@ -1,6 +1,13 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-body { background: linear-gradient(135deg, #7dd3fc 0%, #60a5fa 35%, #6366f1 100%); color: #0f172a; }
+body {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.06) 100%),
+    radial-gradient(1200px 800px at 50% -200px, #93c5fd 0%, rgba(147,197,253,0) 60%),
+    linear-gradient(135deg, #7dd3fc 0%, #60a5fa 35%, #6366f1 100%);
+  background-attachment: fixed, fixed, fixed;
+  color: #0f172a;
+}
 
 :root {
   --glass-bg: rgba(255,255,255,0.3);
@@ -24,8 +31,17 @@ body { background: linear-gradient(135deg, #7dd3fc 0%, #60a5fa 35%, #6366f1 100%
 .search input { flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.25); color: #0f172a; outline: none; backdrop-filter: blur(6px); }
 .search input::placeholder { color: rgba(15,23,42,0.7); }
 
-button { padding: 10px 14px; cursor: pointer; border: none; border-radius: 10px; background: var(--accent); color: white; font-weight: 600; box-shadow: 0 8px 16px rgba(2,132,199,0.25); transition: transform .06s ease; }
-button:hover { transform: translateY(-1px); }
+button { padding: 10px 14px; cursor: pointer; border: none; border-radius: 10px; background: var(--accent); color: white; font-weight: 600; box-shadow: 0 8px 16px rgba(2,132,199,0.25); transition: transform .06s ease, filter .12s ease; }
+button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+
+/* button variants */
+.btn { padding: 10px 14px; border-radius: 10px; color: #fff; font-weight: 700; box-shadow: 0 8px 16px rgba(2,6,23,0.18); }
+.btn-refresh { background: #10b981; box-shadow: 0 8px 16px rgba(16,185,129,0.28); }
+.btn-refresh:hover { filter: brightness(1.06); }
+.btn-fav { background: #f59e0b; box-shadow: 0 8px 16px rgba(245,158,11,0.32); }
+.btn-fav:hover { filter: brightness(1.06); }
+.btn-search { background: #6366f1; box-shadow: 0 8px 16px rgba(99,102,241,0.32); }
+.btn-search:hover { filter: brightness(1.06); }
 
 .card { border-radius: 16px; padding: 16px; background: var(--glass-bg); border: 1px solid var(--glass-brd); box-shadow: 0 20px 30px rgba(2,6,23,0.12); backdrop-filter: blur(8px); }
 .card .muted { color: var(--muted); font-size: 13px; }
