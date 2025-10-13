@@ -21,8 +21,12 @@ const fmtTime = (dt: string) => {
   return `${hh}시`
 }
 
+import { useEffect, useRef } from 'react'
+
 export default function ForecastList({ items, selectedDateTime }: { items: ForecastItem[]; selectedDateTime?: string }) {
   if (!items || items.length === 0) return null
+
+  const elRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const byDate: Record<string, ForecastItem[]> = {}
   for (const it of items) {
@@ -34,6 +38,14 @@ export default function ForecastList({ items, selectedDateTime }: { items: Forec
     byDate[k].sort((a, b) => (a.dateTime || '').localeCompare(b.dateTime || ''))
   }
 
+  useEffect(() => {
+    if (!selectedDateTime) return
+    const el = elRefs.current[selectedDateTime]
+    if (el) {
+      el.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedDateTime])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {Object.entries(byDate).map(([date, arr]) => (
@@ -43,7 +55,7 @@ export default function ForecastList({ items, selectedDateTime }: { items: Forec
             {arr.map((it, idx) => {
               const sel = selectedDateTime && it.dateTime === selectedDateTime
               return (
-                <div key={idx} className="card" ref={(el) => { if (sel && el) el.scrollIntoView({ inline: 'center', behavior: 'smooth' }) }}
+                <div key={idx} className="card" ref={(el) => { elRefs.current[it.dateTime] = el }}
                      style={{ outline: sel ? '2px solid #ef4444' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <div className="muted">{fmtTime(it.dateTime)}</div>

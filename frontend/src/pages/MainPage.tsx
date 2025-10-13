@@ -149,6 +149,7 @@ export default function MainPage() {
           <input
             value={city}
             onChange={(e) => setCity(e.target.value)}
+            onFocus={() => setSelectedDateTime(null)}
             placeholder="도시명을 입력하세요"
           />
           <button type="submit">검색</button>
