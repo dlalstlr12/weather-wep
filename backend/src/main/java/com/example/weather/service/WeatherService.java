@@ -1,44 +1,64 @@
 package com.example.weather.service;
 
 import com.example.weather.dto.WeatherDtos;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class WeatherService {
 
-    public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city) {
-        // TODO: KMA 연동 전까지 더미 데이터 반환
-        // 추후: lat/lon -> nx,ny 변환 후 KMA 초단기/단기 예보를 호출하여 정규화
-        double temp = 20.0;
-        double pcp = 0.0;
-        String sky = "맑음";
+    private final KmaClient kmaClient;
 
+    public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city) {
+        // 간단 프리셋(임시): 도시명이 오면 좌표 대체
         if (city != null && !city.isBlank()) {
-            Map<String, Double> presets = Map.of(
-                    // 간단 프리셋 (임시)
-                    "seoul_lat", 37.5665,
-                    "seoul_lon", 126.9780,
-                    "busan_lat", 35.1796,
-                    "busan_lon", 129.0756
-            );
-            if (city.toLowerCase().contains("busan") || city.contains("부산")) {
-                lat = presets.get("busan_lat");
-                lon = presets.get("busan_lon");
-                sky = "구름 조금";
-            } else {
-                lat = presets.get("seoul_lat");
-                lon = presets.get("seoul_lon");
+            String c = city.toLowerCase(Locale.ROOT);
+            if (c.contains("busan") || city.contains("부산")) {
+                lat = 35.1796; lon = 129.0756;
+            } else { // default: 서울
+                lat = 37.5665; lon = 126.9780;
             }
         }
 
-        if (lat != null && lon != null) {
-            // 위치에 따라 더미값 살짝 변주
-            temp = 18.0 + (lat % 5);
-            pcp = Math.max(0.0, (lon % 3) - 1);
-            sky = pcp > 0.5 ? "흐림" : sky;
+        if (lat == null || lon == null) {
+            // 좌표가 없다면 의미있는 응답 불가
+            throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
         }
-        return new WeatherDtos.CurrentWeatherResponse(temp, pcp, sky);
+
+        Map<String, String> now = kmaClient.getUltraNowcast(lat, lon);
+
+        // 실황: T1H/RN1, 예보: TMP/PCP
+        String t = firstNonNull(now.get("T1H"), now.get("TMP"));
+        String p = firstNonNull(now.get("RN1"), now.get("PCP"));
+        Double temperature = parseDoubleSafe(t);
+        Double precipitation = normalizePrecipitation(p);
+        String sky = KmaClient.skyCodeToText(now.get("SKY"));
+
+        return new WeatherDtos.CurrentWeatherResponse(temperature, precipitation, sky);
+    }
+
+    private static Double parseDoubleSafe(String v) {
+        if (v == null || v.isBlank() || "-".equals(v)) return null;
+        try { return Double.parseDouble(v); } catch (Exception e) { return null; }
+    }
+
+    private static String firstNonNull(String a, String b) {
+        return (a != null && !a.isBlank() && !"-".equals(a)) ? a : b;
+    }
+
+    private static Double normalizePrecipitation(String p) {
+        if (p == null || p.isBlank() || "-".equals(p)) return null;
+        // 허브 예보 PCP는 문자열(예: "강수없음", "1mm 미만")일 수 있음
+        String s = p.trim();
+        if (s.contains("없음")) return 0.0;
+        if (s.contains("미만")) return 0.0; // 보수적으로 0 처리
+        // 단위 제거
+        s = s.replace("mm", "").trim();
+        try { return Double.parseDouble(s); } catch (Exception e) { return null; }
     }
 }

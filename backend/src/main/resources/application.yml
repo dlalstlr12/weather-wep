@@ -34,3 +34,15 @@ jwt:
 
 kma:
   service-key: ${KMA_SERVICE_KEY:}
+  # provider: data (기본, data.go.kr) | hub (기상청 API Hub)
+  provider: hub
+  # data.go.kr 기본 base-url (사용 중인 엔드포인트)
+  data:
+    base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
+  # 기상청 API Hub 설정 (사용 전 실제 경로/헤더명을 확인해 수정하세요)
+  hub:
+    base-url: https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0
+    auth:
+      mode: query        # header | query
+      header-name: x-api-key
+      query-name: authKey
