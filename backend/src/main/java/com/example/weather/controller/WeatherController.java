@@ -24,4 +24,13 @@ public class WeatherController {
     ) {
         return ResponseEntity.ok(weatherService.getCurrent(lat, lon, city));
     }
+
+    @GetMapping("/forecast")
+    public ResponseEntity<WeatherDtos.ForecastResponse> forecast(
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lon", required = false) Double lon,
+            @RequestParam(value = "city", required = false) String city
+    ) {
+        return ResponseEntity.ok(weatherService.getForecast(lat, lon, city));
+    }
 }

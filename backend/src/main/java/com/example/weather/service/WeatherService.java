@@ -42,6 +42,39 @@ public class WeatherService {
         return new WeatherDtos.CurrentWeatherResponse(temperature, precipitation, sky);
     }
 
+    public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city) {
+        if (city != null && !city.isBlank()) {
+            String c = city.toLowerCase(Locale.ROOT);
+            if (c.contains("busan") || city.contains("부산")) {
+                lat = 35.1796; lon = 129.0756;
+            } else {
+                lat = 37.5665; lon = 126.9780;
+            }
+        }
+        if (lat == null || lon == null) {
+            throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
+        }
+        var list = kmaClient.getVilageForecast(lat, lon);
+        java.util.List<WeatherDtos.ForecastEntry> items = new java.util.ArrayList<>();
+        for (var m : list) {
+            String dt = m.get("dateTime");
+            String t = firstNonNull(m.get("TMP"), m.get("T1H"));
+            String p = firstNonNull(m.get("PCP"), m.get("RN1"));
+            String skyCode = m.get("SKY");
+            String popStr = m.get("POP");
+            String rehStr = m.get("REH");
+            String wsdStr = m.get("WSD");
+            Double temperature = parseDoubleSafe(t);
+            Double precipitation = normalizePrecipitation(p);
+            String sky = KmaClient.skyCodeToText(skyCode);
+            Integer pop = parseIntSafe(popStr);
+            Integer reh = parseIntSafe(rehStr);
+            Double wsd = parseDoubleSafe(wsdStr);
+            items.add(new WeatherDtos.ForecastEntry(dt, temperature, precipitation, sky, pop, reh, wsd));
+        }
+        return new WeatherDtos.ForecastResponse(items);
+    }
+
     private static Double parseDoubleSafe(String v) {
         if (v == null || v.isBlank() || "-".equals(v)) return null;
         try { return Double.parseDouble(v); } catch (Exception e) { return null; }
@@ -53,12 +86,15 @@ public class WeatherService {
 
     private static Double normalizePrecipitation(String p) {
         if (p == null || p.isBlank() || "-".equals(p)) return null;
-        // 허브 예보 PCP는 문자열(예: "강수없음", "1mm 미만")일 수 있음
         String s = p.trim();
         if (s.contains("없음")) return 0.0;
         if (s.contains("미만")) return 0.0; // 보수적으로 0 처리
-        // 단위 제거
         s = s.replace("mm", "").trim();
         try { return Double.parseDouble(s); } catch (Exception e) { return null; }
+    }
+
+    private static Integer parseIntSafe(String v) {
+        if (v == null || v.isBlank() || "-".equals(v)) return null;
+        try { return Integer.parseInt(v); } catch (Exception e) { return null; }
     }
 }

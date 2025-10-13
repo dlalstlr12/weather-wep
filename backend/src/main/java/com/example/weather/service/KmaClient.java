@@ -52,6 +52,92 @@ public class KmaClient {
         this.hubQueryName = hubQueryName;
     }
 
+    public java.util.List<java.util.Map<String, String>> getVilageForecast(double lat, double lon) {
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new IllegalStateException("KMA 서비스키가 설정되어 있지 않습니다. KMA_SERVICE_KEY 환경변수를 설정하세요.");
+        }
+        KmaGridConverter.Grid grid = KmaGridConverter.toGrid(lat, lon);
+        Base base = computeVilageBase();
+
+        Map<String, Object> body;
+        String url;
+
+        if ("hub".equalsIgnoreCase(provider)) {
+            String query = String.format(Locale.ROOT,
+                    "?pageNo=1&numOfRows=1000&dataType=JSON&base_date=%s&base_time=%s&nx=%d&ny=%d",
+                    base.date, base.time, grid.nx(), grid.ny());
+            url = hubBaseUrl + "/getVilageFcst" + query;
+            if ("header".equalsIgnoreCase(hubAuthMode)) {
+                final String requestUrl = url;
+                body = http.get()
+                        .uri(URI.create(requestUrl))
+                        .header(hubHeaderName, serviceKey)
+                        .retrieve()
+                        .onStatus(HttpStatusCode::isError, (r, res) -> {
+                            throw new RuntimeException("KMA(Hub) 호출 실패: HTTP " + res.getStatusCode() + " url=" + requestUrl);
+                        })
+                        .body(Map.class);
+            } else {
+                String sep = url.contains("?") ? "&" : "?";
+                url = url + sep + hubQueryName + "=" + encodeIfNeeded(serviceKey);
+                final String requestUrl = url;
+                body = http.get()
+                        .uri(URI.create(requestUrl))
+                        .retrieve()
+                        .onStatus(HttpStatusCode::isError, (r, res) -> {
+                            throw new RuntimeException("KMA(Hub) 호출 실패: HTTP " + res.getStatusCode() + " url=" + requestUrl);
+                        })
+                        .body(Map.class);
+            }
+        } else {
+            String key = encodeIfNeeded(serviceKey);
+            url = String.format(Locale.ROOT,
+                    "%s/getVilageFcst?serviceKey=%s&pageNo=1&numOfRows=1000&dataType=JSON&base_date=%s&base_time=%s&nx=%d&ny=%d",
+                    dataBaseUrl, key, base.date, base.time, grid.nx(), grid.ny());
+            final String requestUrl = url;
+            body = http.get()
+                    .uri(URI.create(requestUrl))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new RuntimeException("KMA 호출 실패: HTTP " + res.getStatusCode() + " url=" + requestUrl);
+                    })
+                    .body(Map.class);
+        }
+
+        java.util.Map<String, java.util.Map<String, String>> grouped = new java.util.LinkedHashMap<>();
+        try {
+            Map<?, ?> response = (Map<?, ?>) body.get("response");
+            Map<?, ?> header = (Map<?, ?>) response.get("header");
+            Object resultCode = header.get("resultCode");
+            if (resultCode != null && !"00".equals(resultCode.toString())) {
+                throw new RuntimeException("KMA 오류: code=" + resultCode + ", msg=" + header.get("resultMsg"));
+            }
+            Map<?, ?> bodyObj = (Map<?, ?>) response.get("body");
+            Map<?, ?> items = (Map<?, ?>) bodyObj.get("items");
+            @SuppressWarnings("unchecked")
+            java.util.List<java.util.Map<String, Object>> list = (java.util.List<java.util.Map<String, Object>>) items.get("item");
+            if (list != null) {
+                for (java.util.Map<String, Object> item : list) {
+                    String date = String.valueOf(item.get("fcstDate"));
+                    String time = String.valueOf(item.get("fcstTime"));
+                    String dateTime = date + time;
+                    String category = String.valueOf(item.get("category"));
+                    String value = String.valueOf(item.get("fcstValue"));
+                    grouped.computeIfAbsent(dateTime, k -> new java.util.HashMap<>()).put(category, value);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("KMA 응답 파싱 실패", e);
+        }
+
+        java.util.List<java.util.Map<String, String>> out = new java.util.ArrayList<>();
+        for (var e : grouped.entrySet()) {
+            java.util.Map<String, String> m = new java.util.HashMap<>(e.getValue());
+            m.put("dateTime", e.getKey());
+            out.add(m);
+        }
+        return out;
+    }
     public Map<String, String> getUltraNowcast(double lat, double lon) {
         if (serviceKey == null || serviceKey.isBlank()) {
             throw new IllegalStateException("KMA 서비스키가 설정되어 있지 않습니다. KMA_SERVICE_KEY 환경변수를 설정하세요.");
