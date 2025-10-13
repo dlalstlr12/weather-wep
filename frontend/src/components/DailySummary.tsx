@@ -22,15 +22,15 @@ function summarize(items: ForecastItem[]): DayStat[] {
     }))
 }
 
-const fmtDate = (d: string) => `${d.slice(4, 6)}/${d.slice(6, 8)}`
+const fmtDate = (d: string) => `${Number(d.slice(4, 6))}월 ${Number(d.slice(6, 8))}일`
 
 export default function DailySummary({ items }: { items: ForecastItem[] }) {
   const stats = summarize(items)
   if (!stats.length) return null
   return (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-      {stats.slice(0, 2).map((s) => (
-        <div key={s.date} className="card" style={{ padding: 14, minWidth: 200 }}>
+    <div className="daily-grid">
+      {stats.slice(0, 5).map((s) => (
+        <div key={s.date} className="card" style={{ padding: 14 }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>{fmtDate(s.date)}</div>
           <div style={{ display: 'flex', gap: 12 }}>
             <div>

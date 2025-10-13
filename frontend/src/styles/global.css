@@ -64,3 +64,9 @@ label { display: flex; flex-direction: column; gap: 4px; }
 /* subtle scrollbar for forecast scroller */
 .card::-webkit-scrollbar, .forecast-scroll::-webkit-scrollbar { height: 8px; }
 .card::-webkit-scrollbar-thumb, .forecast-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 99px; }
+
+/* daily summary responsive layout */
+.daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+@media (max-width: 640px) {
+  .daily-grid { grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); overflow-x: auto; padding-bottom: 4px; }
+}
