@@ -57,7 +57,7 @@ public class KmaClient {
         this.hubQueryName = hubQueryName;
     }
 
-    public java.util.List<java.util.Map<String, String>> getVilageForecast(double lat, double lon) {
+    public java.util.List<java.util.Map<String, String>> getVilageForecast(double lat, double lon, boolean nocache) {
         if (serviceKey == null || serviceKey.isBlank()) {
             throw new IllegalStateException("KMA 서비스키가 설정되어 있지 않습니다. KMA_SERVICE_KEY 환경변수를 설정하세요.");
         }
@@ -71,7 +71,7 @@ public class KmaClient {
                 "%s|vilage|%d|%d|%s|%s", provider.toLowerCase(Locale.ROOT), grid.nx(), grid.ny(), base.date, base.time);
 
         CacheEntry ce = cache.get(cacheKey);
-        if (ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
+        if (!nocache && ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
             @SuppressWarnings("unchecked")
             java.util.List<java.util.Map<String, String>> cached = (java.util.List<java.util.Map<String, String>>) ce.data;
             return cached;
@@ -154,7 +154,7 @@ public class KmaClient {
         cache.put(cacheKey, new CacheEntry(out, System.currentTimeMillis()));
         return out;
     }
-    public Map<String, String> getUltraNowcast(double lat, double lon) {
+    public Map<String, String> getUltraNowcast(double lat, double lon, boolean nocache) {
         if (serviceKey == null || serviceKey.isBlank()) {
             throw new IllegalStateException("KMA 서비스키가 설정되어 있지 않습니다. KMA_SERVICE_KEY 환경변수를 설정하세요.");
         }
@@ -168,7 +168,7 @@ public class KmaClient {
                 "%s|ultra|%d|%d|%s|%s", provider.toLowerCase(Locale.ROOT), grid.nx(), grid.ny(), base.date, base.time);
 
         CacheEntry ce = cache.get(cacheKey);
-        if (ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
+        if (!nocache && ce != null && (System.currentTimeMillis() - ce.ts) < TTL_MILLIS) {
             @SuppressWarnings("unchecked")
             Map<String, String> cached = (Map<String, String>) ce.data;
             return cached;

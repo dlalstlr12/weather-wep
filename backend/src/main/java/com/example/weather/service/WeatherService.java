@@ -14,7 +14,7 @@ public class WeatherService {
 
     private final KmaClient kmaClient;
 
-    public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city) {
+    public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city, boolean nocache) {
         // 간단 프리셋(임시): 도시명이 오면 좌표 대체
         if (city != null && !city.isBlank()) {
             String c = city.toLowerCase(Locale.ROOT);
@@ -30,7 +30,7 @@ public class WeatherService {
             throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
         }
 
-        Map<String, String> now = kmaClient.getUltraNowcast(lat, lon);
+        Map<String, String> now = kmaClient.getUltraNowcast(lat, lon, nocache);
 
         // 실황: T1H/RN1, 예보: TMP/PCP
         String t = firstNonNull(now.get("T1H"), now.get("TMP"));
@@ -42,7 +42,7 @@ public class WeatherService {
         return new WeatherDtos.CurrentWeatherResponse(temperature, precipitation, sky);
     }
 
-    public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city) {
+    public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city, boolean nocache) {
         if (city != null && !city.isBlank()) {
             String c = city.toLowerCase(Locale.ROOT);
             if (c.contains("busan") || city.contains("부산")) {
@@ -54,7 +54,7 @@ public class WeatherService {
         if (lat == null || lon == null) {
             throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
         }
-        var list = kmaClient.getVilageForecast(lat, lon);
+        var list = kmaClient.getVilageForecast(lat, lon, nocache);
         java.util.List<WeatherDtos.ForecastEntry> items = new java.util.ArrayList<>();
         for (var m : list) {
             String dt = m.get("dateTime");
