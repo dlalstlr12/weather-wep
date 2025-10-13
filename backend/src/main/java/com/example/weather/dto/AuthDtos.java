@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public class AuthDtos {
     public record SignupRequest(
+            @NotBlank String name,
             @NotBlank @Email String email,
             @NotBlank String password
     ) {}

@@ -4,10 +4,14 @@ import ForecastList from '../components/ForecastList'
 import WeatherIcon from '../components/WeatherIcon'
 import DailySummary from '../components/DailySummary'
 import TempChart from '../components/TempChart'
+import { isAuthenticated, getUserName } from '../auth'
+import { consumeFlash } from '../flash'
+import { useNavigate } from 'react-router-dom'
 
 type Coords = { lat: number; lon: number }
 
 export default function MainPage() {
+  const nav = useNavigate()
   const [coords, setCoords] = useState<Coords | null>(null)
   const [city, setCity] = useState('')
   const [weather, setWeather] = useState<any>(null)
@@ -17,12 +21,16 @@ export default function MainPage() {
   const [locationLabel, setLocationLabel] = useState('')
   const [selectedDateTime, setSelectedDateTime] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<string[]>([])
+  const [userName, setUserName] = useState<string | null>(getUserName())
+  const [notice, setNotice] = useState<string>('')
 
   useEffect(() => {
     const saved = localStorage.getItem('favCities')
     if (saved) {
       try { setFavorites(JSON.parse(saved)) } catch {}
     }
+    const msg = consumeFlash()
+    if (msg) setNotice(msg)
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -32,6 +40,15 @@ export default function MainPage() {
       () => {}
     )
   }, [])
+
+  const onLogin = () => {
+    nav('/login')
+  }
+  const onLogout = () => {
+    localStorage.removeItem('accessToken')
+    setUserName(null)
+    setNotice('로그아웃되었습니다.')
+  }
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -130,6 +147,9 @@ export default function MainPage() {
 
   return (
     <div className="container">
+      {notice && (
+        <div className="notice" style={{ marginBottom: 12 }}>{notice}</div>
+      )}
       <header className="header">
         <div className="title">
           <WeatherIcon sky={weather?.sky || '맑음'} size={28} />
@@ -138,9 +158,17 @@ export default function MainPage() {
             <div className="subtitle">{locationLabel ? `${locationLabel} · ` : ''}현재 조건과 3시간 간격 예보</div>
           </div>
         </div>
-        <div className="chips">
-          <button onClick={onRefresh}>새로고침</button>
-          <button onClick={addFavorite}>즐겨찾기 추가</button>
+        <div className="chips" style={{ alignItems: 'center' }}>
+          <button className="btn btn-refresh" onClick={onRefresh}>새로고침</button>
+          <button className="btn btn-fav" onClick={addFavorite}>즐겨찾기 추가</button>
+          {isAuthenticated() ? (
+            <>
+              <span className="chip" style={{ cursor: 'default' }}><b>{userName || '사용자'}</b>님 반갑습니다</span>
+              <button className="btn btn-logout" onClick={onLogout}>로그아웃</button>
+            </>
+          ) : (
+            <button className="btn btn-search" onClick={onLogin}>로그인</button>
+          )}
         </div>
       </header>
 
@@ -152,7 +180,7 @@ export default function MainPage() {
             onFocus={() => setSelectedDateTime(null)}
             placeholder="도시명을 입력하세요"
           />
-          <button type="submit">검색</button>
+          <button type="submit" className="btn btn-search">검색</button>
         </form>
         {favorites.length > 0 && (
           <div className="chips" style={{ marginTop: 10, flexWrap: 'wrap' }}>

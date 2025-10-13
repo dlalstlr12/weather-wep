@@ -1,13 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+import { setFlash, consumeFlash } from '../flash'
 
 export default function LoginPage() {
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const msg = consumeFlash()
+    if (msg) setNotice(msg)
+  }, [])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +28,8 @@ export default function LoginPage() {
       })
       if (res?.accessToken) {
         localStorage.setItem('accessToken', res.accessToken)
-        nav('/chat', { replace: true })
+        setFlash('로그인되었습니다.')
+        nav('/', { replace: true })
       } else {
         setError('로그인 실패')
       }
@@ -35,6 +43,7 @@ export default function LoginPage() {
   return (
     <div className="container small">
       <h2>로그인</h2>
+      {notice && <div className="notice" style={{ marginBottom: 12 }}>{notice}</div>}
       <form onSubmit={onSubmit} className="form">
         <label>
           이메일
@@ -45,8 +54,12 @@ export default function LoginPage() {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>{loading ? '처리 중...' : '로그인'}</button>
+        <button type="submit" className="btn btn-search" disabled={loading}>{loading ? '처리 중...' : '로그인'}</button>
       </form>
+      <div style={{ marginTop: 12 }}>
+        <span className="muted">계정이 없으신가요? </span>
+        <Link to="/signup">회원가입</Link>
+      </div>
     </div>
   )
 }

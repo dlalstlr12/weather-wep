@@ -42,6 +42,8 @@ button:hover { transform: translateY(-1px); filter: brightness(1.05); }
 .btn-fav:hover { filter: brightness(1.06); }
 .btn-search { background: #6366f1; box-shadow: 0 8px 16px rgba(99,102,241,0.32); }
 .btn-search:hover { filter: brightness(1.06); }
+.btn-logout { background: #ef4444; box-shadow: 0 8px 16px rgba(239,68,68,0.28); }
+.btn-logout:hover { filter: brightness(1.06); }
 
 .card { border-radius: 16px; padding: 16px; background: var(--glass-bg); border: 1px solid var(--glass-brd); box-shadow: 0 20px 30px rgba(2,6,23,0.12); backdrop-filter: blur(8px); }
 .card .muted { color: var(--muted); font-size: 13px; }
@@ -53,6 +55,8 @@ button:hover { transform: translateY(-1px); filter: brightness(1.05); }
 h2 { margin: 0 0 8px; color: #f8fafc; font-weight: 800; letter-spacing: -0.02em; }
 
 .error { color: #fef2f2; background: rgba(239,68,68,0.25); border: 1px solid rgba(239,68,68,0.45); padding: 10px 12px; border-radius: 10px; }
+
+.notice { color: #064e3b; background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.35); padding: 10px 12px; border-radius: 10px; }
 
 .form { display: flex; flex-direction: column; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; }

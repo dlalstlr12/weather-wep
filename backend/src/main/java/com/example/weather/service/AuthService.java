@@ -25,6 +25,7 @@ public class AuthService {
         User u = new User();
         u.setEmail(req.email());
         u.setPasswordHash(passwordEncoder.encode(req.password()));
+        u.setName(req.name());
         userRepository.save(u);
     }
 
@@ -35,7 +36,9 @@ public class AuthService {
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
-        String token = jwtProvider.generateToken(user.getEmail());
+        String token = jwtProvider.generateToken(user.getEmail(), java.util.Map.of(
+                "name", user.getName()
+        ));
         return new AuthDtos.TokenResponse(token);
     }
 }
