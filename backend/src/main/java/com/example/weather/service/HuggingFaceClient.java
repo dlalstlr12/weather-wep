@@ -10,9 +10,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Component
 @RequiredArgsConstructor
@@ -122,6 +129,91 @@ public class HuggingFaceClient {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public void streamChat(String prompt, Consumer<String> onDelta) {
+        String base = (apiBase == null ? "https://api-inference.huggingface.co/models" : apiBase.trim()).replaceAll("/+$(?-i)", "");
+        String modelId = (model == null ? "" : model.trim());
+        boolean isRouterChat = base.contains("/v1/chat/completions");
+        if (!isRouterChat) {
+            // Fallback: single-shot
+            String out = generate(prompt);
+            if (out != null && !out.isBlank()) onDelta.accept(out);
+            return;
+        }
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(base);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "text/event-stream");
+            conn.setRequestProperty("User-Agent", "weather-backend/1.0");
+            if (apiToken != null && !apiToken.isBlank()) {
+                conn.setRequestProperty("Authorization", "Bearer " + apiToken);
+            }
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("model", modelId);
+            body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            body.put("temperature", 0.7);
+            body.put("max_tokens", 256);
+            body.put("stream", true);
+            String json = mapper.writeValueAsString(body);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(json.getBytes(StandardCharsets.UTF_8));
+            }
+
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) {
+                String err = null;
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line; while ((line = br.readLine()) != null) sb.append(line);
+                    err = sb.toString();
+                } catch (Exception ignored) {}
+                throw new RuntimeException("HF Inference API error (" + code + ") | url=" + base + " | model=" + modelId + (err != null ? (": " + err) : ""));
+            }
+
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.isBlank()) continue; // SSE frame separator
+                    if (!line.startsWith("data:")) continue;
+                    String data = line.substring(5).trim();
+                    if ("[DONE]".equals(data)) break;
+                    try {
+                        Map<String, Object> obj = mapper.readValue(data, new TypeReference<>(){});
+                        List<Map<String, Object>> choices = (List<Map<String, Object>>) obj.get("choices");
+                        if (choices != null && !choices.isEmpty()) {
+                            Map<String, Object> first = choices.get(0);
+                            Map<String, Object> delta = (Map<String, Object>) first.get("delta");
+                            if (delta != null) {
+                                Object content = delta.get("content");
+                                if (content != null) onDelta.accept(String.valueOf(content));
+                                continue;
+                            }
+                            Map<String, Object> message = (Map<String, Object>) first.get("message");
+                            if (message != null) {
+                                Object content = message.get("content");
+                                if (content != null) onDelta.accept(String.valueOf(content));
+                                continue;
+                            }
+                            Object text = first.get("text");
+                            if (text != null) onDelta.accept(String.valueOf(text));
+                        }
+                    } catch (Exception ignored) {
+                        // If not JSON, emit raw line for visibility
+                        onDelta.accept(data);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (conn != null) conn.disconnect();
         }
     }
 }

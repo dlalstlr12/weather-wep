@@ -31,6 +31,9 @@ export default function ChatPage() {
     }
   }, [msgs])
 
+  const [typing, setTyping] = useState(false)
+  const [ctrl, setCtrl] = useState<AbortController | null>(null)
+
   const send = async () => {
     const text = input.trim()
     if (!text || loading) return
@@ -38,27 +41,72 @@ export default function ChatPage() {
     setMsgs((m) => [...m, u])
     setInput('')
     setLoading(true)
+    setTyping(true)
     try {
-      const assistant = await requestAssistant([...msgs, u])
-      setMsgs((m) => [...m, assistant])
+      await requestAssistantStream([...msgs, u])
     } catch (e) {
       setMsgs((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', at: Date.now(), content: '죄송해요, 응답 중 오류가 발생했어요.' }])
     } finally {
       setLoading(false)
+      setTyping(false)
     }
   }
 
-  const requestAssistant = async (history: Msg[]): Promise<Msg> => {
-    // 백엔드 DTO에 맞춰 변환
+  const requestAssistantStream = async (history: Msg[]): Promise<void> => {
+    const assistantId = crypto.randomUUID()
+    // 미리 assistant 메시지 placeholder 추가
+    setMsgs((m) => [...m, { id: assistantId, role: 'assistant', content: '', at: Date.now() }])
+
     const messages = history.map(h => ({ role: h.role, content: h.content }))
-    const res = await api('/api/chat', {
+    const controller = new AbortController()
+    setCtrl(controller)
+    const res = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('accessToken') ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` } : {})
+      },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal
     })
-    const content = res?.content || '죄송해요, 지금은 답변을 생성할 수 없어요.'
-    return { id: crypto.randomUUID(), role: 'assistant', content, at: Date.now() }
+    if (!res.ok || !res.body) throw new Error('스트리밍 시작 실패')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      // SSE 프레임 분리 (\n\n 기준)
+      const parts = buffer.split(/\n\n/)
+      buffer = parts.pop() || ''
+      for (const chunk of parts) {
+        // data: 내용 라인만 추출
+        const lines = chunk.split(/\n/)
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const data = line.slice(5).trim()
+          if (data === '[DONE]') {
+            return
+          }
+          if (data.startsWith('[ERROR]')) {
+            throw new Error(data)
+          }
+          // 누적 반영
+          setMsgs((m) => m.map(msg => msg.id === assistantId ? { ...msg, content: msg.content + data } : msg))
+        }
+      }
+    }
+    setCtrl(null)
   }
+
+  useEffect(() => {
+    return () => {
+      // 컴포넌트 언마운트 시 진행 중 스트림 중단
+      try { ctrl?.abort() } catch {}
+    }
+  }, [])
 
   return (
     <div className="container">
