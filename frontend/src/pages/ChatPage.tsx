@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import Markdown from '../components/Markdown'
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; at: number }
 type Coords = { lat: number; lon: number }
@@ -119,15 +120,25 @@ export default function ChatPage() {
           <div key={m.id} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             <div style={{ maxWidth: '78%', padding: '10px 12px', borderRadius: 14, whiteSpace: 'pre-wrap', lineHeight: 1.4,
               background: m.role === 'user' ? '#6366f1' : 'rgba(255,255,255,0.75)', color: m.role === 'user' ? '#fff' : '#0f172a' }}>
-              {m.content}
+              {m.role === 'assistant' ? (
+                <Markdown>{m.content}</Markdown>
+              ) : (
+                m.content
+              )}
             </div>
           </div>
         ))}
         {loading && <div className="muted">응답 생성 중...</div>}
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); send() }} className="search" style={{ marginTop: 12 }}>
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="메시지를 입력하세요" />
-        <button type="submit" className="btn btn-search" disabled={loading || !input.trim()}>보내기</button>
+      <form onSubmit={(e) => { e.preventDefault(); send() }} className="search" style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+        <input style={{ flex: 1 }} value={input} onChange={(e) => setInput(e.target.value)} placeholder="메시지를 입력하세요" />
+        {!loading ? (
+          <button type="submit" className="btn btn-search" disabled={loading || !input.trim()}>보내기</button>
+        ) : (
+          <button type="button" className="btn btn-danger" onClick={() => { try { ctrl?.abort() } catch {} }}>
+            취소
+          </button>
+        )}
       </form>
     </div>
   )
