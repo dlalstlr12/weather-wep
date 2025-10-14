@@ -39,7 +39,7 @@ export default function ChatPage() {
     setInput('')
     setLoading(true)
     try {
-      const assistant = await replyWeatherAware(text)
+      const assistant = await requestAssistant([...msgs, u])
       setMsgs((m) => [...m, assistant])
     } catch (e) {
       setMsgs((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', at: Date.now(), content: '죄송해요, 응답 중 오류가 발생했어요.' }])
@@ -48,59 +48,16 @@ export default function ChatPage() {
     }
   }
 
-  const replyWeatherAware = async (text: string): Promise<Msg> => {
-    const lower = text.toLowerCase()
-    const hasWeather = lower.includes('날씨')
-    const cityMatch = text.match(/([가-힣A-Za-z]+)\s*(?:오늘|내일|모레|날씨)/)
-    const wantsTomorrow = text.includes('내일')
-    const wantsToday = text.includes('오늘') || !wantsTomorrow
-
-    try {
-      if (hasWeather) {
-        let current: any | null = null
-        let forecast: any | null = null
-        if (cityMatch && cityMatch[1]) {
-          const q = encodeURIComponent(cityMatch[1])
-          ;[current, forecast] = await Promise.all([
-            api(`/api/weather/current?city=${q}`),
-            api(`/api/weather/forecast?city=${q}`)
-          ])
-        } else if (coords) {
-          ;[current, forecast] = await Promise.all([
-            api(`/api/weather/current?lat=${coords.lat}&lon=${coords.lon}`),
-            api(`/api/weather/forecast?lat=${coords.lat}&lon=${coords.lon}`)
-          ])
-        } else {
-          // fallback: 서울
-          ;[current, forecast] = await Promise.all([
-            api(`/api/weather/current?city=${encodeURIComponent('서울')}`),
-            api(`/api/weather/forecast?city=${encodeURIComponent('서울')}`)
-          ])
-        }
-
-        const parts: string[] = []
-        if (current) {
-          parts.push(`지금 기온은 ${fmtNum(current.temperature)}°C, 하늘은 ${current.sky}입니다.`)
-        }
-        if (forecast?.items?.length) {
-          const today = dateKey(new Date())
-          const tomorrow = addDaysKey(new Date(), 1)
-          const pick = wantsTomorrow ? tomorrow : today
-          const dayTemps = forecast.items.filter((it: any) => it.dateTime?.startsWith(pick)).map((it: any) => it.temperature).filter((t: any) => t != null)
-          if (dayTemps.length) {
-            const min = Math.min(...dayTemps)
-            const max = Math.max(...dayTemps)
-            parts.push(`${wantsTomorrow ? '내일' : '오늘'} 예상 최저 ${fmtNum(min)}°C, 최고 ${fmtNum(max)}°C입니다.`)
-          }
-        }
-        if (parts.length === 0) parts.push('해당 위치의 날씨 정보를 찾지 못했어요.')
-        return { id: crypto.randomUUID(), role: 'assistant', content: parts.join(' '), at: Date.now() }
-      }
-    } catch (e) {
-      // fall through to help text
-    }
-    const help = '날씨 관련 질문을 해보세요. 예) "현재 날씨", "부산 내일 날씨", "서울 오늘 날씨"'
-    return { id: crypto.randomUUID(), role: 'assistant', content: help, at: Date.now() }
+  const requestAssistant = async (history: Msg[]): Promise<Msg> => {
+    // 백엔드 DTO에 맞춰 변환
+    const messages = history.map(h => ({ role: h.role, content: h.content }))
+    const res = await api('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    })
+    const content = res?.content || '죄송해요, 지금은 답변을 생성할 수 없어요.'
+    return { id: crypto.randomUUID(), role: 'assistant', content, at: Date.now() }
   }
 
   return (

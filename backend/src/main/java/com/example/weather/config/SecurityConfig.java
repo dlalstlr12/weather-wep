@@ -36,6 +36,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/actuator/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/chat/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/weather/**").permitAll()
                 .anyRequest().authenticated()
             )

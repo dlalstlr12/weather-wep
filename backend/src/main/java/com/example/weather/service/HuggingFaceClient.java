@@ -1,0 +1,127 @@
+package com.example.weather.service;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Component
+@RequiredArgsConstructor
+public class HuggingFaceClient {
+
+    @Value("${huggingface.api-base}")
+    private String apiBase;
+
+    @Value("${huggingface.model}")
+    private String model;
+
+    @Value("${huggingface.api-token}")
+    private String apiToken;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
+    public String generate(String prompt) {
+        try {
+            String base = (apiBase == null ? "https://api-inference.huggingface.co/models" : apiBase.trim()).replaceAll("/+$(?-i)", "");
+            String modelId = (model == null ? "" : model.trim());
+            boolean isRouterChat = base.contains("/v1/chat/completions");
+            String url = isRouterChat ? base : (base + "/" + modelId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            headers.set("User-Agent", "weather-backend/1.0");
+            if (apiToken != null && !apiToken.isBlank()) {
+                headers.set("Authorization", "Bearer " + apiToken);
+            }
+            Map<String, Object> body = new HashMap<>();
+            if (isRouterChat) {
+                // OpenAI-compatible chat/completions schema
+                body.put("model", modelId);
+                body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+                body.put("temperature", 0.7);
+                body.put("max_tokens", 256);
+                body.put("stream", false);
+            } else {
+                // Legacy inference API schema
+                body.put("inputs", prompt);
+                Map<String, Object> params = new HashMap<>();
+                params.put("max_new_tokens", 256);
+                params.put("temperature", 0.7);
+                params.put("return_full_text", false);
+                body.put("parameters", params);
+            }
+
+            String json = mapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(json, headers);
+
+            ResponseEntity<String> resp;
+            try {
+                resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            } catch (HttpStatusCodeException ex) {
+                String respBody = ex.getResponseBodyAsString();
+                String message = "HF Inference API error (" + ex.getStatusCode().value() + " " + ex.getStatusText() + ")" +
+                        " | url=" + url + " | model=" + modelId;
+                if (respBody != null && !respBody.isBlank()) {
+                    // Try to extract 'error' field if JSON
+                    try {
+                        Map<String, Object> err = mapper.readValue(respBody, new TypeReference<>(){});
+                        Object e2 = err.get("error");
+                        if (e2 != null) message += ": " + String.valueOf(e2);
+                    } catch (Exception ignored) {
+                        message += ": " + respBody;
+                    }
+                }
+                throw new RuntimeException(message);
+            }
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                throw new RuntimeException("HF Inference API error: " + resp.getStatusCode() + " | url=" + url + " | model=" + modelId);
+            }
+
+            if (isRouterChat) {
+                // Parse OpenAI-style response
+                Map<String, Object> root = mapper.readValue(resp.getBody(), new TypeReference<>(){});
+                Object err = root.get("error");
+                if (err != null) throw new RuntimeException("HF Inference API error: " + err + " | url=" + url + " | model=" + modelId);
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> first = choices.get(0);
+                    Map<String, Object> message = (Map<String, Object>) first.get("message");
+                    if (message != null) {
+                        Object content = message.get("content");
+                        if (content != null) return String.valueOf(content).trim();
+                    }
+                }
+                // Fallback to usage of text field if present
+                Object text = root.get("text");
+                if (text != null) return String.valueOf(text).trim();
+                return "";
+            } else {
+                // Parse legacy array response: [{generated_text: "..."}]
+                List<Map<String, Object>> arr = mapper.readValue(resp.getBody(), new TypeReference<>(){});
+                if (!arr.isEmpty()) {
+                    Object gt = arr.get(0).get("generated_text");
+                    if (gt != null) return String.valueOf(gt).trim();
+                }
+                // Some models may return dict with error
+                Map<String, Object> maybeErr = null;
+                try { maybeErr = mapper.readValue(resp.getBody(), new TypeReference<>(){}); } catch (Exception ignored) {}
+                if (maybeErr != null && maybeErr.containsKey("error")) {
+                    throw new RuntimeException("HF Inference API error: " + maybeErr.get("error"));
+                }
+                return "";
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
