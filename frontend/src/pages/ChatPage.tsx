@@ -67,7 +67,7 @@ export default function ChatPage() {
         'Content-Type': 'application/json',
         ...(localStorage.getItem('accessToken') ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` } : {})
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, lat: coords?.lat ?? null, lon: coords?.lon ?? null }),
       signal: controller.signal
     })
     if (!res.ok || !res.body) throw new Error('스트리밍 시작 실패')
