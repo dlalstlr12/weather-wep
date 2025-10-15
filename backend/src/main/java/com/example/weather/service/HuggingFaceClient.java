@@ -59,9 +59,29 @@ public class HuggingFaceClient {
             if (isRouterChat) {
                 // OpenAI-compatible chat/completions schema
                 body.put("model", modelId);
-                body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+                body.put("messages", buildMessages(prompt));
                 body.put("temperature", 0.2);
-                body.put("max_tokens", 256);
+                body.put("max_tokens", 160);
+                body.put("frequency_penalty", 0.6);
+                body.put("presence_penalty", 0.0);
+                body.put("top_p", 0.9);
+                body.put("top_k", 40);
+                body.put("stop", List.of(
+                        "사용자:",
+                        "도우미:",
+                        "현재 요약:",
+                        "예보 요약:",
+                        "참고 요약",
+                        "지시사항:",
+                        "데이터 오류:",
+                        "추가 정보:",
+                        "```",
+                        "```python",
+                        "from ",
+                        "import ",
+                        "def ",
+                        "class ")
+                );
                 body.put("stream", false);
             } else {
                 // Legacy inference API schema
@@ -167,9 +187,29 @@ public class HuggingFaceClient {
 
             Map<String, Object> body = new HashMap<>();
             body.put("model", modelId);
-            body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            body.put("messages", buildMessages(prompt));
             body.put("temperature", 0.2);
-            body.put("max_tokens", 256);
+            body.put("max_tokens", 160);
+            body.put("frequency_penalty", 0.6);
+            body.put("presence_penalty", 0.0);
+            body.put("top_p", 0.9);
+            body.put("top_k", 40);
+            body.put("stop", List.of(
+                    "사용자:",
+                    "도우미:",
+                    "현재 요약:",
+                    "예보 요약:",
+                    "참고 요약",
+                    "지시사항:",
+                    "데이터 오류:",
+                    "추가 정보:",
+                    "```",
+                    "```python",
+                    "from ",
+                    "import ",
+                    "def ",
+                    "class ")
+            );
             body.put("stream", true);
             String json = mapper.writeValueAsString(body);
             try (OutputStream os = conn.getOutputStream()) {
@@ -225,5 +265,23 @@ public class HuggingFaceClient {
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    private List<Map<String, Object>> buildMessages(String prompt) {
+        // First paragraph (up to first blank line) as system; rest as user
+        String sys = null;
+        String user = prompt;
+        int cut = prompt.indexOf("\n\n");
+        if (cut > 0) {
+            sys = prompt.substring(0, cut).trim();
+            user = prompt.substring(cut + 2).trim();
+        }
+        if (sys == null || sys.isBlank()) {
+            return List.of(Map.of("role", "user", "content", user));
+        }
+        return List.of(
+                Map.of("role", "system", "content", sys),
+                Map.of("role", "user", "content", user)
+        );
     }
 }

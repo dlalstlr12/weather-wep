@@ -6,13 +6,20 @@ FROM "C:\models\llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf"
 # 추론 파라미터(필요에 따라 조정 가능)
 PARAMETER temperature 0.2
 PARAMETER num_ctx 4096
-
-# 간단 템플릿(선택): 한글 대화 형식
-TEMPLATE """{{ .System }}
-
-{{- range .Messages }}
-{{- if eq .Role "user" }}[사용자] {{ .Content }}{{ end -}}
-{{- if eq .Role "assistant" }}[도우미] {{ .Content }}{{ end -}}
-{{- end }}
-
-[도우미]"""
+PARAMETER repeat_penalty 1.15
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER stop "사용자:"
+PARAMETER stop "도우미:"
+PARAMETER stop "현재 요약:"
+PARAMETER stop "예보 요약:"
+PARAMETER stop "참고 요약"
+PARAMETER stop "지시사항:"
+PARAMETER stop "데이터 오류:"
+PARAMETER stop "추가 정보:"
+PARAMETER stop "```"
+PARAMETER stop "```python"
+PARAMETER stop "from "
+PARAMETER stop "import "
+PARAMETER stop "def "
+PARAMETER stop "class "
