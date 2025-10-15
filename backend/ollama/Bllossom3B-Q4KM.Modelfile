@@ -1,0 +1,18 @@
+# Modelfile for Ollama
+# NOTE: 아래 GGUF 경로를 실제 저장 위치로 수정하세요.
+# 예: C:\\models\\llama-3.2-korean-bllossom-3b-q4_k_m.gguf
+FROM "C:\models\llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf"
+
+# 추론 파라미터(필요에 따라 조정 가능)
+PARAMETER temperature 0.2
+PARAMETER num_ctx 4096
+
+# 간단 템플릿(선택): 한글 대화 형식
+TEMPLATE """{{ .System }}
+
+{{- range .Messages }}
+{{- if eq .Role "user" }}[사용자] {{ .Content }}{{ end -}}
+{{- if eq .Role "assistant" }}[도우미] {{ .Content }}{{ end -}}
+{{- end }}
+
+[도우미]"""
