@@ -11,7 +11,10 @@ public class ChatDtos {
     ) {}
 
     public record ChatRequest(
-            @NotNull List<Message> messages
+            @NotNull List<Message> messages,
+            Double lat,
+            Double lon,
+            String city
     ) {}
 
     public record ChatResponse(

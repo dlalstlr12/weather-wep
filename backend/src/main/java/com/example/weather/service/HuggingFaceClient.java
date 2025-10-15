@@ -60,7 +60,7 @@ public class HuggingFaceClient {
                 // OpenAI-compatible chat/completions schema
                 body.put("model", modelId);
                 body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-                body.put("temperature", 0.7);
+                body.put("temperature", 0.2);
                 body.put("max_tokens", 256);
                 body.put("stream", false);
             } else {
@@ -168,7 +168,7 @@ public class HuggingFaceClient {
             Map<String, Object> body = new HashMap<>();
             body.put("model", modelId);
             body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-            body.put("temperature", 0.7);
+            body.put("temperature", 0.2);
             body.put("max_tokens", 256);
             body.put("stream", true);
             String json = mapper.writeValueAsString(body);
