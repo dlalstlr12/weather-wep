@@ -43,6 +43,11 @@ public class HuggingFaceClient {
             String modelId = (model == null ? "" : model.trim());
             boolean isRouterChat = base.contains("/v1/chat/completions");
             String url = isRouterChat ? base : (base + "/" + modelId);
+            // debug
+            try {
+                String tokenInfo = (apiToken == null ? "null" : ("len=" + apiToken.trim().length()));
+                System.out.println("[HF] base=" + base + ", model=" + modelId + ", token(" + tokenInfo + ")");
+            } catch (Exception ignored) {}
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -144,6 +149,11 @@ public class HuggingFaceClient {
         }
         HttpURLConnection conn = null;
         try {
+            // debug
+            try {
+                String tokenInfo = (apiToken == null ? "null" : ("len=" + apiToken.trim().length()));
+                System.out.println("[HF-stream] base=" + base + ", model=" + modelId + ", token(" + tokenInfo + ")");
+            } catch (Exception ignored) {}
             URL url = new URL(base);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
