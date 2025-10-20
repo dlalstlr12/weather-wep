@@ -25,6 +25,12 @@ export default function MainPage() {
   const [favorites, setFavorites] = useState<string[]>([])
   const [userName, setUserName] = useState<string | null>(getUserName())
   const [notice, setNotice] = useState<string>('')
+  const [placeQuery, setPlaceQuery] = useState('')
+  const [placeResults, setPlaceResults] = useState<Array<{ name: string; address: string; lat: number; lon: number }>>([])
+  const [selectedPlace, setSelectedPlace] = useState<{ name: string; lat: number; lon: number } | null>(null)
+  const [placesSearchKey, setPlacesSearchKey] = useState<string | null>(null)
+  const [placesDebouncedKey, setPlacesDebouncedKey] = useState<string | null>(null)
+  const [showPlaceResults, setShowPlaceResults] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('favCities')
@@ -82,6 +88,16 @@ export default function MainPage() {
     fetchWeather()
   }, [coords])
 
+  // Debounce for Kakao places search (only after submit)
+  useEffect(() => {
+    if (!showPlaceResults || !placesSearchKey || !placesSearchKey.trim()) {
+      setPlacesDebouncedKey(null)
+      return
+    }
+    const t = setTimeout(() => setPlacesDebouncedKey(placesSearchKey.trim()), 300)
+    return () => clearTimeout(t)
+  }, [placesSearchKey, showPlaceResults])
+
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!city.trim()) return
@@ -99,6 +115,12 @@ export default function MainPage() {
       // 검색 기반으로 지도는 도시 지오코딩을 사용하도록 좌표를 비웁니다.
       setCoords(null)
       setMapCenter(null)
+      setSelectedPlace(null)
+      // 장소 검색 상태 초기화
+      setShowPlaceResults(false)
+      setPlaceResults([])
+      setPlacesSearchKey(null)
+      setPlacesDebouncedKey(null)
       setSelectedDateTime(null)
     } catch (e) {
       setError('도시의 날씨 정보를 불러오지 못했습니다.')
@@ -156,6 +178,12 @@ export default function MainPage() {
       // 즐겨찾기 선택 시에도 지도는 도시 지오코딩을 사용하도록 좌표를 비웁니다.
       setCoords(null)
       setMapCenter(null)
+      setSelectedPlace(null)
+      // 장소 검색 상태 초기화
+      setShowPlaceResults(false)
+      setPlaceResults([])
+      setPlacesSearchKey(null)
+      setPlacesDebouncedKey(null)
       setSelectedDateTime(null)
     } catch (e) { setError('도시의 날씨 정보를 불러오지 못했습니다.') }
     finally { setLoading(false) }
@@ -210,6 +238,23 @@ export default function MainPage() {
 
       <section className="section" style={{ marginTop: 12 }}>
         <h2>지도</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            setSelectedPlace(null)
+            setShowPlaceResults(true)
+            setPlacesSearchKey(placeQuery)
+          }}
+          className="search"
+          style={{ marginBottom: 8 }}
+        >
+          <input
+            value={placeQuery}
+            onChange={(e) => setPlaceQuery(e.target.value)}
+            placeholder="장소 검색(예: 서울역, 카페, 공원)"
+          />
+          <button type="submit" className="btn btn-search">장소 검색</button>
+        </form>
         <div className="chips" style={{ marginBottom: 8, gap: 8 }}>
           <button
             className="btn btn-refresh"
@@ -221,6 +266,7 @@ export default function MainPage() {
                   setCoords(c)
                   setLocationLabel('현재 위치')
                   setCity('')
+                  setSelectedPlace(null)
                 },
                 () => {}
               )
@@ -233,6 +279,7 @@ export default function MainPage() {
               setCoords({ lat: mapCenter.lat, lon: mapCenter.lon })
               setLocationLabel('지도 중심')
               setCity('')
+              setSelectedPlace(null)
             }}
           >지도 중심으로 조회</button>
         </div>
@@ -241,10 +288,18 @@ export default function MainPage() {
           city={(locationLabel && locationLabel !== '현재 위치') ? locationLabel : (city.trim() || null)}
           level={7}
           height={360}
+          placesKeyword={showPlaceResults ? placesDebouncedKey : null}
+          onPlacesResult={(list) => setPlaceResults(list)}
           onClick={(pos) => {
             setCoords({ lat: pos.lat, lon: pos.lon })
             setLocationLabel('지도 선택 위치')
             setCity('')
+            setSelectedPlace(null)
+            // 장소 검색 상태 초기화
+            setShowPlaceResults(false)
+            setPlaceResults([])
+            setPlacesSearchKey(null)
+            setPlacesDebouncedKey(null)
           }}
           onCenterChange={(c) => {
             setMapCenter({ lat: c.lat, lon: c.lon })
@@ -254,8 +309,50 @@ export default function MainPage() {
             setCoords({ lat, lon })
             setLocationLabel(cname)
             setCity('')
+            setSelectedPlace(null)
+            // 장소 검색 상태 초기화
+            setShowPlaceResults(false)
+            setPlaceResults([])
+            setPlacesSearchKey(null)
+            setPlacesDebouncedKey(null)
           }}
+          selectedPlace={selectedPlace}
         />
+        {showPlaceResults && placeResults.length > 0 && (
+          <div className="card" style={{ marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontWeight: 600 }}>검색 결과</div>
+              <button
+                className="btn btn-fav"
+                onClick={() => {
+                  setShowPlaceResults(false)
+                  setPlaceResults([])
+                  setPlacesSearchKey(null)
+                  setPlacesDebouncedKey(null)
+                }}
+              >닫기</button>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
+              {placeResults.map((p, i) => (
+                <li key={`${p.name}-${i}`} className="chip" style={{ display: 'flex', justifyContent: 'space-between' }}
+                  onClick={() => {
+                    setCoords({ lat: p.lat, lon: p.lon })
+                    setLocationLabel(p.name)
+                    setCity('')
+                    setSelectedPlace({ name: p.name, lat: p.lat, lon: p.lon })
+                    // 선택 직후 리스트 닫기
+                    setShowPlaceResults(false)
+                    setPlacesSearchKey(null)
+                    setPlacesDebouncedKey(null)
+                  }}
+                >
+                  <span>{p.name}</span>
+                  <span className="muted" style={{ marginLeft: 8 }}>{p.address}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="content">

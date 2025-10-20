@@ -15,6 +15,9 @@ export type KakaoMapProps = {
   onCenterChange?: (center: { lat: number; lon: number }) => void
   markerCities?: string[]
   onMarkerClick?: (payload: { city: string; lat: number; lon: number }) => void
+  placesKeyword?: string | null
+  onPlacesResult?: (list: Array<{ name: string; address: string; lat: number; lon: number }>) => void
+  selectedPlace?: { name: string; lat: number; lon: number } | null
 }
 
 function loadKakaoSdk(appKey: string): Promise<any> {
@@ -38,10 +41,11 @@ function loadKakaoSdk(appKey: string): Promise<any> {
   })
 }
 
-export default function KakaoMap({ width = '100%', height = 360, coords, city, level = 7, onClick, onCenterChange, markerCities, onMarkerClick }: KakaoMapProps) {
+export default function KakaoMap({ width = '100%', height = 360, coords, city, level = 7, onClick, onCenterChange, markerCities, onMarkerClick, placesKeyword, onPlacesResult, selectedPlace }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [ready, setReady] = useState(false)
   const appKey = useMemo(() => (import.meta as any).env?.VITE_KAKAO_MAPS_KEY as string, [])
+  const placeMarkersRef = useRef<any[]>([])
 
   useEffect(() => {
     if (!appKey) return
@@ -110,6 +114,42 @@ export default function KakaoMap({ width = '100%', height = 360, coords, city, l
       })
     }
 
+    // Places search: emit list only (no auto markers/centering)
+    if (placesKeyword && placesKeyword.trim().length > 0) {
+      const places = new kakao.maps.services.Places()
+      places.keywordSearch(placesKeyword.trim(), (data: any[], status: string) => {
+        if (status !== kakao.maps.services.Status.OK || !data) {
+          if (onPlacesResult) onPlacesResult([])
+          return
+        }
+        const list: Array<{ name: string; address: string; lat: number; lon: number }> = []
+        data.slice(0, 10).forEach((p: any) => {
+          const lat = Number(p.y), lon = Number(p.x)
+          list.push({ name: p.place_name, address: p.road_address_name || p.address_name || '', lat, lon })
+        })
+        if (onPlacesResult) onPlacesResult(list)
+      })
+    } else if (onPlacesResult) {
+      onPlacesResult([])
+    }
+
+    // When a place is selected by parent, add a marker and center
+    if (selectedPlace) {
+      const pos = new kakao.maps.LatLng(selectedPlace.lat, selectedPlace.lon)
+      const marker = new kakao.maps.Marker({ position: pos })
+      marker.setMap(map)
+      const iw = new kakao.maps.InfoWindow({ content: `<div style=\"padding:6px 8px;\">${selectedPlace.name}</div>` })
+      iw.open(map, marker)
+      map.setCenter(pos)
+      // limit dynamic place markers to 8
+      placeMarkersRef.current.push(marker)
+      while (placeMarkersRef.current.length > 8) {
+        const old = placeMarkersRef.current.shift()
+        try { old.setMap(null) } catch {}
+      }
+      if (onMarkerClick) onMarkerClick({ city: selectedPlace.name, lat: selectedPlace.lat, lon: selectedPlace.lon })
+    }
+
     // click handler
     if (onClick) {
       kakao.maps.event.addListener(map, 'click', function (mouseEvent: any) {
@@ -130,7 +170,7 @@ export default function KakaoMap({ width = '100%', height = 360, coords, city, l
 
     // cleanup: nothing critical to destroy
     return () => {}
-  }, [ready, coords?.lat, coords?.lon, city, level, markerCities && markerCities.join('|')])
+  }, [ready, coords?.lat, coords?.lon, city, level, markerCities && markerCities.join('|'), placesKeyword, selectedPlace && `${selectedPlace.name}:${selectedPlace.lat}:${selectedPlace.lon}`])
 
   return (
     <div style={{ width, height, borderRadius: 8, overflow: 'hidden', border: '1px solid #1f2937' }}>
