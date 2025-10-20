@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 import { useNavigate, Link } from 'react-router-dom'
+import BrandBar from '../components/BrandBar'
 import { setFlash } from '../flash'
 
 export default function SignupPage() {
@@ -42,6 +43,7 @@ export default function SignupPage() {
 
   return (
     <div className="container small">
+      <BrandBar align="center" size={40} />
       <div className="chips" style={{ marginBottom: 8 }}>
         <button className="btn btn-refresh" onClick={() => nav('/')}>메인으로</button>
       </div>

@@ -7,6 +7,7 @@ import TempChart from '../components/TempChart'
 import { isAuthenticated, getUserName } from '../auth'
 import { consumeFlash } from '../flash'
 import { useNavigate } from 'react-router-dom'
+import BrandBar from '../components/BrandBar'
 import KakaoMap from '../components/KakaoMap'
 
 type Coords = { lat: number; lon: number }
@@ -191,6 +192,7 @@ export default function MainPage() {
 
   return (
     <div className="container">
+      <BrandBar align="center" size={56} />
       {notice && (
         <div className="notice" style={{ marginBottom: 12 }}>{notice}</div>
       )}

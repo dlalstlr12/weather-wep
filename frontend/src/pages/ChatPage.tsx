@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BrandBar from '../components/BrandBar'
 import Markdown from '../components/Markdown'
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; at: number }
@@ -110,6 +111,7 @@ export default function ChatPage() {
 
   return (
     <div className="container">
+      <BrandBar align="center" size={48} />
       <div className="chips" style={{ marginBottom: 8 }}>
         <button className="btn btn-refresh" onClick={() => nav('/')}>메인으로</button>
       </div>
