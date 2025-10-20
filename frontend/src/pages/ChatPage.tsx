@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
 import Markdown from '../components/Markdown'
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; at: number }
@@ -32,7 +31,7 @@ export default function ChatPage() {
     }
   }, [msgs])
 
-  const [typing, setTyping] = useState(false)
+  const [, setTyping] = useState(false)
   const [ctrl, setCtrl] = useState<AbortController | null>(null)
 
   const send = async () => {
@@ -142,21 +141,4 @@ export default function ChatPage() {
       </form>
     </div>
   )
-}
-
-function dateKey(d: Date) {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}${m}${day}`
-}
-function addDaysKey(d: Date, n: number) {
-  const t = new Date(d)
-  t.setDate(t.getDate() + n)
-  return dateKey(t)
-}
-function fmtNum(n: any) {
-  const v = Number(n)
-  if (Number.isFinite(v)) return Math.round(v * 10) / 10
-  return n
 }
