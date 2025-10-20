@@ -212,6 +212,21 @@ export default function MainPage() {
         <h2>지도</h2>
         <div className="chips" style={{ marginBottom: 8, gap: 8 }}>
           <button
+            className="btn btn-refresh"
+            onClick={() => {
+              if (!navigator.geolocation) return
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  const c = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+                  setCoords(c)
+                  setLocationLabel('현재 위치')
+                  setCity('')
+                },
+                () => {}
+              )
+            }}
+          >현재 위치로</button>
+          <button
             className="btn btn-search"
             onClick={() => {
               if (!mapCenter) return
@@ -233,6 +248,12 @@ export default function MainPage() {
           }}
           onCenterChange={(c) => {
             setMapCenter({ lat: c.lat, lon: c.lon })
+          }}
+          markerCities={favorites}
+          onMarkerClick={({ city: cname, lat, lon }) => {
+            setCoords({ lat, lon })
+            setLocationLabel(cname)
+            setCity('')
           }}
         />
       </section>

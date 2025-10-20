@@ -13,6 +13,8 @@ export type KakaoMapProps = {
   level?: number // zoom level (1~14, bigger is farther)
   onClick?: (pos: { lat: number; lon: number }) => void
   onCenterChange?: (center: { lat: number; lon: number }) => void
+  markerCities?: string[]
+  onMarkerClick?: (payload: { city: string; lat: number; lon: number }) => void
 }
 
 function loadKakaoSdk(appKey: string): Promise<any> {
@@ -36,7 +38,7 @@ function loadKakaoSdk(appKey: string): Promise<any> {
   })
 }
 
-export default function KakaoMap({ width = '100%', height = 360, coords, city, level = 7, onClick, onCenterChange }: KakaoMapProps) {
+export default function KakaoMap({ width = '100%', height = 360, coords, city, level = 7, onClick, onCenterChange, markerCities, onMarkerClick }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [ready, setReady] = useState(false)
   const appKey = useMemo(() => (import.meta as any).env?.VITE_KAKAO_MAPS_KEY as string, [])
@@ -86,6 +88,28 @@ export default function KakaoMap({ width = '100%', height = 360, coords, city, l
       })
     }
 
+    // Favorite city markers
+    if (markerCities && markerCities.length > 0) {
+      const geocoder = new kakao.maps.services.Geocoder()
+      markerCities.slice(0, 20).forEach((cname) => {
+        if (!cname) return
+        geocoder.addressSearch(cname, (result: any[], status: string) => {
+          if (status === kakao.maps.services.Status.OK && result && result.length > 0) {
+            const r = result[0]
+            const pos = new kakao.maps.LatLng(Number(r.y), Number(r.x))
+            const marker = new kakao.maps.Marker({ position: pos })
+            marker.setMap(map)
+            const iw = new kakao.maps.InfoWindow({ content: `<div style="padding:6px 8px;">${cname}</div>` })
+            kakao.maps.event.addListener(marker, 'click', function () {
+              map.setCenter(pos)
+              iw.open(map, marker)
+              if (onMarkerClick) onMarkerClick({ city: cname, lat: Number(r.y), lon: Number(r.x) })
+            })
+          }
+        })
+      })
+    }
+
     // click handler
     if (onClick) {
       kakao.maps.event.addListener(map, 'click', function (mouseEvent: any) {
@@ -106,7 +130,7 @@ export default function KakaoMap({ width = '100%', height = 360, coords, city, l
 
     // cleanup: nothing critical to destroy
     return () => {}
-  }, [ready, coords?.lat, coords?.lon, city, level])
+  }, [ready, coords?.lat, coords?.lon, city, level, markerCities && markerCities.join('|')])
 
   return (
     <div style={{ width, height, borderRadius: 8, overflow: 'hidden', border: '1px solid #1f2937' }}>
