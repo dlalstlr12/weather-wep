@@ -14,6 +14,7 @@ type Coords = { lat: number; lon: number }
 export default function MainPage() {
   const nav = useNavigate()
   const [coords, setCoords] = useState<Coords | null>(null)
+  const [mapCenter, setMapCenter] = useState<Coords | null>(null)
   const [city, setCity] = useState('')
   const [weather, setWeather] = useState<any>(null)
   const [forecast, setForecast] = useState<any[]>([])
@@ -95,6 +96,9 @@ export default function MainPage() {
       setWeather(cur)
       setForecast(fc?.items || [])
       setLocationLabel(city.trim())
+      // 검색 기반으로 지도는 도시 지오코딩을 사용하도록 좌표를 비웁니다.
+      setCoords(null)
+      setMapCenter(null)
       setSelectedDateTime(null)
     } catch (e) {
       setError('도시의 날씨 정보를 불러오지 못했습니다.')
@@ -149,6 +153,9 @@ export default function MainPage() {
         api(`/api/weather/forecast?city=${q}`)
       ])
       setWeather(cur); setForecast(fc?.items || [])
+      // 즐겨찾기 선택 시에도 지도는 도시 지오코딩을 사용하도록 좌표를 비웁니다.
+      setCoords(null)
+      setMapCenter(null)
       setSelectedDateTime(null)
     } catch (e) { setError('도시의 날씨 정보를 불러오지 못했습니다.') }
     finally { setLoading(false) }
@@ -203,11 +210,30 @@ export default function MainPage() {
 
       <section className="section" style={{ marginTop: 12 }}>
         <h2>지도</h2>
+        <div className="chips" style={{ marginBottom: 8, gap: 8 }}>
+          <button
+            className="btn btn-search"
+            onClick={() => {
+              if (!mapCenter) return
+              setCoords({ lat: mapCenter.lat, lon: mapCenter.lon })
+              setLocationLabel('지도 중심')
+              setCity('')
+            }}
+          >지도 중심으로 조회</button>
+        </div>
         <KakaoMap
           coords={coords}
           city={(locationLabel && locationLabel !== '현재 위치') ? locationLabel : (city.trim() || null)}
           level={7}
           height={360}
+          onClick={(pos) => {
+            setCoords({ lat: pos.lat, lon: pos.lon })
+            setLocationLabel('지도 선택 위치')
+            setCity('')
+          }}
+          onCenterChange={(c) => {
+            setMapCenter({ lat: c.lat, lon: c.lon })
+          }}
         />
       </section>
 
