@@ -24,9 +24,9 @@ public class ChatService {
                 .reduce((a,b) -> b)
                 .map(ChatDtos.Message::content)
                 .orElse("");
-        String inferredCity = inferCity(req.city(), lastUser);
-        boolean wantForecast = containsAny(lastUser, "예보","내일","모레","주간","forecast");
-        boolean wantCurrent = containsAny(lastUser, "현재","지금","오늘","now","current");
+        String inferredCity = IntentParser.inferCity(req.city(), lastUser);
+        boolean wantForecast = IntentParser.containsAny(lastUser, "예보","내일","모레","주간","forecast");
+        boolean wantCurrent = IntentParser.containsAny(lastUser, "현재","지금","오늘","now","current");
         if ((wantForecast || wantCurrent) && inferredCity == null && req.lat() == null && req.lon() == null) {
             return new ChatDtos.ChatResponse("도움을 드리려면 대략적인 위치(예: 서울)와 시점(현재/내일/주간)을 알려주세요.");
         }
@@ -36,7 +36,7 @@ public class ChatService {
                 if (wantCurrent) {
                     Double lat = req.lat(), lon = req.lon();
                     if ((lat == null || lon == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat = c[0]; lon = c[1]; }
                     }
                     WeatherDtos.CurrentWeatherResponse cw = weatherService.getCurrent(lat, lon, inferredCity, false);
@@ -46,11 +46,11 @@ public class ChatService {
                 } else {
                     Double lat = req.lat(), lon = req.lon();
                     if ((lat == null || lon == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat = c[0]; lon = c[1]; }
                     }
                     WeatherDtos.ForecastResponse fr = weatherService.getForecast(lat, lon, inferredCity, false);
-                    int idx = chooseForecastIndex(fr, lastUser);
+                    int idx = ForecastSelector.chooseIndex(fr, lastUser);
                     String out = NlgFormatter.formatForecast(fr, inferredCity, lastUser, idx);
                     out = TextSanitizer.sanitize(out);
                     if (out != null && !out.isBlank()) return new ChatDtos.ChatResponse(out);
@@ -76,9 +76,9 @@ public class ChatService {
                 .reduce((a,b) -> b)
                 .map(ChatDtos.Message::content)
                 .orElse("");
-        String inferredCity = inferCity(req.city(), lastUser);
-        boolean wantForecast = containsAny(lastUser, "예보","내일","모레","주간","forecast");
-        boolean wantCurrent = containsAny(lastUser, "현재","지금","오늘","now","current");
+        String inferredCity = IntentParser.inferCity(req.city(), lastUser);
+        boolean wantForecast = IntentParser.containsAny(lastUser, "예보","내일","모레","주간","forecast");
+        boolean wantCurrent = IntentParser.containsAny(lastUser, "현재","지금","오늘","now","current");
         if ((wantForecast || wantCurrent) && inferredCity == null && req.lat() == null && req.lon() == null) {
             try {
                 emitter.send(SseEmitter.event().data("도움을 드리려면 대략적인 위치(예: 서울)와 시점(현재/내일/주간)을 알려주세요."));
@@ -98,7 +98,7 @@ public class ChatService {
                 if (wantCurrent) {
                     Double lat = req.lat(), lon = req.lon();
                     if ((lat == null || lon == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat = c[0]; lon = c[1]; }
                     }
                     WeatherDtos.CurrentWeatherResponse cw = weatherService.getCurrent(lat, lon, inferredCity, false);
@@ -106,11 +106,11 @@ public class ChatService {
                 } else {
                     Double lat = req.lat(), lon = req.lon();
                     if ((lat == null || lon == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat = c[0]; lon = c[1]; }
                     }
                     WeatherDtos.ForecastResponse fr = weatherService.getForecast(lat, lon, inferredCity, false);
-                    int idx = chooseForecastIndex(fr, lastUser);
+                    int idx = ForecastSelector.chooseIndex(fr, lastUser);
                     out = NlgFormatter.formatForecast(fr, inferredCity, lastUser, idx);
                 }
                 out = TextSanitizer.sanitize(out);
@@ -174,22 +174,22 @@ public class ChatService {
                 .map(ChatDtos.Message::content)
                 .orElse("");
 
-        boolean wantForecast = containsAny(lastUser, "예보","내일","모레","주간","forecast");
-        boolean wantCurrent = containsAny(lastUser, "현재","지금","오늘","now","current");
+        boolean wantForecast = IntentParser.containsAny(lastUser, "예보","내일","모레","주간","forecast");
+        boolean wantCurrent = IntentParser.containsAny(lastUser, "현재","지금","오늘","now","current");
 
         // 간단 도시명 추출 (좌표/명시적 city가 없는 경우 보조)
-        String inferredCity = inferCity(req.city(), lastUser);
+        String inferredCity = IntentParser.inferCity(req.city(), lastUser);
         StringBuilder ctx = new StringBuilder();
         if (wantForecast || wantCurrent) {
             try {
                 if (wantForecast) {
                     Double lat0 = req.lat(), lon0 = req.lon();
                     if ((lat0 == null || lon0 == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat0 = c[0]; lon0 = c[1]; }
                     }
                     WeatherDtos.ForecastResponse fr = weatherService.getForecast(lat0, lon0, inferredCity, false);
-                    int idx = chooseForecastIndex(fr, lastUser);
+                    int idx = ForecastSelector.chooseIndex(fr, lastUser);
                     if (idx >= 0 && idx < fr.items().size()) {
                         var it = fr.items().get(idx);
                         ctx.append("예보 요약: ");
@@ -200,7 +200,7 @@ public class ChatService {
                 } else {
                     Double lat0 = req.lat(), lon0 = req.lon();
                     if ((lat0 == null || lon0 == null) && inferredCity != null) {
-                        double[] c = geocode(inferredCity);
+                        double[] c = GeoService.geocode(inferredCity);
                         if (c != null) { lat0 = c[0]; lon0 = c[1]; }
                     }
                     WeatherDtos.CurrentWeatherResponse cw = weatherService.getCurrent(lat0, lon0, inferredCity, false);
@@ -218,141 +218,7 @@ public class ChatService {
         return prompt;
     }
 
-    private static String inferCity(String explicitCity, String lastUser) {
-        if (explicitCity != null && !explicitCity.isBlank()) return explicitCity;
-        if (lastUser == null) return null;
-        String t = lastUser.toLowerCase(java.util.Locale.ROOT);
-        if (t.contains("서울") || t.contains("seoul")) return "서울";
-        if (t.contains("부산") || t.contains("busan")) return "부산";
-        if (t.contains("인천") || t.contains("incheon")) return "인천";
-        if (t.contains("대구") || t.contains("daegu")) return "대구";
-        if (t.contains("대전") || t.contains("daejeon")) return "대전";
-        if (t.contains("광주") || t.contains("gwangju")) return "광주";
-        if (t.contains("울산") || t.contains("ulsan")) return "울산";
-        if (t.contains("수원") || t.contains("suwon")) return "수원";
-        if (t.contains("창원") || t.contains("changwon")) return "창원";
-        if (t.contains("고양") || t.contains("goyang")) return "고양";
-        if (t.contains("용인") || t.contains("yongin")) return "용인";
-        return null;
-    }
-
-    private static boolean containsAny(String text, String... keys) {
-        if (text == null) return false;
-        String t = text.toLowerCase(Locale.ROOT);
-        for (String k : keys) {
-            if (t.contains(k.toLowerCase(Locale.ROOT))) return true;
-        }
-        return false;
-    }
-
     private static String nz(Object v) {
         return v == null ? "-" : String.valueOf(v);
-    }
-
-    // removed duplicated NLG/sanitizer helpers; now using NlgFormatter and TextSanitizer
-
-    // ----- Geocoding (basic map for KR major cities) -----
-    private static double[] geocode(String city) {
-        if (city == null) return null;
-        String c = city.trim().toLowerCase(java.util.Locale.ROOT);
-        switch (c) {
-            case "서울": case "seoul": return new double[]{37.5665, 126.9780};
-            case "부산": case "busan": return new double[]{35.1796, 129.0756};
-            case "대구": case "daegu": return new double[]{35.8714, 128.6014};
-            case "인천": case "incheon": return new double[]{37.4563, 126.7052};
-            case "광주": case "gwangju": return new double[]{35.1595, 126.8526};
-            case "대전": case "daejeon": return new double[]{36.3504, 127.3845};
-            case "울산": case "ulsan": return new double[]{35.5384, 129.3114};
-            case "수원": case "suwon": return new double[]{37.2636, 127.0286};
-            case "창원": case "changwon": return new double[]{35.2283, 128.6811};
-            case "고양": case "goyang": return new double[]{37.6584, 126.8320};
-            case "용인": case "yongin": return new double[]{37.2411, 127.1775};
-            default: return null;
-        }
-    }
-
-    // ----- Intent parsing and forecast slot chooser -----
-    private static int chooseForecastIndex(WeatherDtos.ForecastResponse fr, String query) {
-        if (fr == null || fr.items() == null || fr.items().isEmpty()) return -1;
-        Intent intent = parseIntent(query);
-        java.time.LocalDate baseDate = java.time.LocalDate.now(java.time.ZoneId.systemDefault()).plusDays(intent.dayOffset);
-        Integer targetHour = targetHourForWindow(intent.window);
-        int bestIdx = -1;
-        long bestScore = Long.MAX_VALUE;
-        for (int i = 0; i < fr.items().size(); i++) {
-            var it = fr.items().get(i);
-            java.time.LocalDateTime dt = parseDateTimeSafe(String.valueOf(it.dateTime()));
-            if (dt == null) continue;
-            if (!dt.toLocalDate().isEqual(baseDate)) continue;
-            long score = 0;
-            if (targetHour != null) {
-                score = Math.abs(dt.getHour() - targetHour);
-            } else {
-                // midday default
-                score = Math.abs(dt.getHour() - 12);
-            }
-            // prefer higher POP when tie
-            try {
-                long negPop = -Math.round(Double.parseDouble(String.valueOf(it.pop())));
-                score = score * 1000 + (negPop + 1000); // stable
-            } catch (Exception ignored) { }
-            if (score < bestScore) { bestScore = score; bestIdx = i; }
-        }
-        if (bestIdx == -1) {
-            // fallback: pick first
-            bestIdx = 0;
-        }
-        return bestIdx;
-    }
-
-    private static class Intent {
-        int dayOffset; // 0 today, 1 tomorrow, 2 day after
-        String window; // morning/afternoon/evening/night/any
-    }
-
-    private static Intent parseIntent(String text) {
-        Intent in = new Intent();
-        in.dayOffset = 0; in.window = "any";
-        if (text == null) return in;
-        String t = text.toLowerCase(java.util.Locale.ROOT);
-        if (t.contains("모레")) in.dayOffset = 2;
-        else if (t.contains("내일") || t.contains("tomorrow")) in.dayOffset = 1;
-        else if (t.contains("주간") || t.contains("이번 주") || t.contains("한 주")) in.dayOffset = 1; // weekly -> start from tomorrow
-        if (t.contains("오전") || t.contains("morning")) in.window = "morning";
-        else if (t.contains("오후") || t.contains("afternoon")) in.window = "afternoon";
-        else if (t.contains("저녁") || t.contains("evening")) in.window = "evening";
-        else if (t.contains("밤") || t.contains("night")) in.window = "night";
-        return in;
-    }
-
-    private static Integer targetHourForWindow(String window) {
-        if (window == null) return null;
-        switch (window) {
-            case "morning": return 9;
-            case "afternoon": return 15;
-            case "evening": return 19;
-            case "night": return 22;
-            default: return null;
-        }
-    }
-
-    private static java.time.LocalDateTime parseDateTimeSafe(String s) {
-        if (s == null) return null;
-        String[] patterns = new String[]{
-                "yyyy-MM-dd'T'HH:mm:ss",
-                "yyyy-MM-dd HH:mm:ss",
-                "yyyy-MM-dd HH:mm",
-                "yyyy-MM-dd'T'HH:mm",
-                "yyyyMMddHHmm",
-                "yyyyMMddHH"
-        };
-        for (String p : patterns) {
-            try {
-                java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter.ofPattern(p);
-                return java.time.LocalDateTime.parse(s, f);
-            } catch (Exception ignored) { }
-        }
-        try { return java.time.LocalDateTime.parse(s); } catch (Exception ignored) { }
-        return null;
     }
 }
