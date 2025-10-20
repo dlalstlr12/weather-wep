@@ -7,6 +7,7 @@ import TempChart from '../components/TempChart'
 import { isAuthenticated, getUserName } from '../auth'
 import { consumeFlash } from '../flash'
 import { useNavigate } from 'react-router-dom'
+import KakaoMap from '../components/KakaoMap'
 
 type Coords = { lat: number; lon: number }
 
@@ -198,6 +199,16 @@ export default function MainPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="section" style={{ marginTop: 12 }}>
+        <h2>지도</h2>
+        <KakaoMap
+          coords={coords}
+          city={(locationLabel && locationLabel !== '현재 위치') ? locationLabel : (city.trim() || null)}
+          level={7}
+          height={360}
+        />
       </section>
 
       <section className="content">
