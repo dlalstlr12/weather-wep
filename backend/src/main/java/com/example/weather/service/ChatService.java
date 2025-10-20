@@ -284,8 +284,18 @@ public class ChatService {
                 "%s의 현재 하늘은 %s이며 기온 %s°C, 강수 %smm입니다.",
                 "현재 %s%s %s입니다. 기온 %s°C, 강수 %smm입니다."
         };
-        String fmt = choose(templates, loc + temp + pcp);
-        StringBuilder sb = new StringBuilder(String.format(fmt, loc, josa(loc, "은는"), sky, temp, pcp));
+        int idx = Math.abs((loc + temp + pcp).hashCode()) % templates.length;
+        StringBuilder sb;
+        switch (idx) {
+            case 0:
+                sb = new StringBuilder(String.format(templates[0], loc, josa(loc, "은는"), sky, temp, pcp));
+                break;
+            case 1:
+                sb = new StringBuilder(String.format(templates[1], loc, sky, temp, pcp));
+                break;
+            default:
+                sb = new StringBuilder(String.format(templates[2], loc, josa(loc, "은는"), sky, temp, pcp));
+        }
         String advice = buildAdviceCurrent(temp, pcp, sky);
         if (!advice.isBlank()) sb.append(" ").append(advice);
         return sb.toString();
@@ -305,9 +315,21 @@ public class ChatService {
                 "%s의 예보는 %s%s 예상되며 기온 %s°C, 강수확률 %s%%입니다.",
                 "예상되는 %s의 하늘은 %s%s, 기온 %s°C, 강수확률 %s%%입니다."
         };
-        String fmt = choose(templates, loc + temp + pop);
-        StringBuilder sb = new StringBuilder(String.format(fmt,
-                loc, josa(loc, "은는"), sky, josa(sky, "이가"), temp, pop));
+        int fidx = Math.abs((loc + temp + pop).hashCode()) % templates.length;
+        StringBuilder sb;
+        switch (fidx) {
+            case 0:
+                sb = new StringBuilder(String.format(templates[0],
+                        loc, josa(loc, "은는"), sky, josa(sky, "이가"), temp, pop));
+                break;
+            case 1:
+                sb = new StringBuilder(String.format(templates[1],
+                        loc, sky, josa(sky, "이가"), temp, pop));
+                break;
+            default:
+                sb = new StringBuilder(String.format(templates[2],
+                        loc, sky, josa(sky, "이가"), temp, pop));
+        }
         String advice = buildAdviceForecast(temp, pop, sky);
         if (!advice.isBlank()) sb.append(" ").append(advice);
         return sb.toString();
