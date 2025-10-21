@@ -1,0 +1,61 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: weather-mysql
+    environment:
+      - MYSQL_DATABASE=weather_db
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpass}
+      - MYSQL_USER=${MYSQL_USER:-weather}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-weatherpass}
+      - TZ=Asia/Seoul
+    command: ["mysqld", "--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_general_ci"]
+    # Expose only inside compose network to avoid host port conflicts.
+    # If you need host access, map to a free port like "3307:3306".
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - web
+
+  backend:
+    build:
+      context: ./backend
+    image: weather/backend:latest
+    env_file:
+      - .env
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-please-min-32chars-1234567890abcd}
+      - JWT_EXPIRATION_MS=${JWT_EXPIRATION_MS:-604800000}
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/weather_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-weather}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-weatherpass}
+      - JAVA_OPTS=
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - web
+
+  frontend:
+    build:
+      context: ./frontend
+    image: weather/frontend:latest
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks:
+      - web
+
+volumes:
+  db_data:
+
+networks:
+  web:
+    driver: bridge
