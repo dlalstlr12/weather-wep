@@ -10,7 +10,8 @@ pipeline {
   environment {
     // 레지스트리 URL을 문자열로 지정하세요. 예: 'docker.io/your_account' 또는 'registry.example.com'
     REGISTRY_URL = 'docker.io/minsik023'
-    IMAGE_PREFIX = 'weather'
+    IMAGE_BACKEND = 'weather-backend'
+    IMAGE_FRONTEND = 'weather-frontend'
     GIT_SHA = "${env.GIT_COMMIT ?: env.BUILD_TAG}"
     NODE_OPTIONS = '--no-warnings'
   }
@@ -50,13 +51,13 @@ pipeline {
     stage('Docker Build') {
       steps {
         script {
-          def beTag = "${REGISTRY_URL}/${IMAGE_PREFIX}/backend:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-          def feTag = "${REGISTRY_URL}/${IMAGE_PREFIX}/frontend:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+          def beTag = "${REGISTRY_URL}/${IMAGE_BACKEND}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+          def feTag = "${REGISTRY_URL}/${IMAGE_FRONTEND}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
           bat "docker build -t ${beTag} backend"
           bat "docker build -t ${feTag} frontend"
           if (env.BRANCH_NAME == 'main') {
-            bat "docker tag ${beTag} ${REGISTRY_URL}/${IMAGE_PREFIX}/backend:latest"
-            bat "docker tag ${feTag} ${REGISTRY_URL}/${IMAGE_PREFIX}/frontend:latest"
+            bat "docker tag ${beTag} ${REGISTRY_URL}/${IMAGE_BACKEND}:latest"
+            bat "docker tag ${feTag} ${REGISTRY_URL}/${IMAGE_FRONTEND}:latest"
           }
           env.BE_TAG = beTag
           env.FE_TAG = feTag
@@ -72,8 +73,8 @@ pipeline {
           bat "docker push ${env.FE_TAG}"
           script {
             if (env.BRANCH_NAME == 'main') {
-              bat "docker push ${REGISTRY_URL}/${IMAGE_PREFIX}/backend:latest"
-              bat "docker push ${REGISTRY_URL}/${IMAGE_PREFIX}/frontend:latest"
+              bat "docker push ${REGISTRY_URL}/${IMAGE_BACKEND}:latest"
+              bat "docker push ${REGISTRY_URL}/${IMAGE_FRONTEND}:latest"
             }
           }
         }
