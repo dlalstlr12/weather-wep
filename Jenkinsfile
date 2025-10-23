@@ -58,10 +58,6 @@ pipeline {
           def feTag = "${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:${BR}-${env.BUILD_NUMBER}"
           bat "docker build -t ${beTag} backend"
           bat "docker build -t ${feTag} frontend"
-          if (BR == 'main') {
-            bat "docker tag ${beTag} ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_BACKEND}:latest"
-            bat "docker tag ${feTag} ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:latest"
-          }
           env.BE_TAG = beTag
           env.FE_TAG = feTag
         }
@@ -75,13 +71,6 @@ pipeline {
           bat "echo %REG_PASS% | docker login ${REGISTRY_HOST} -u %REG_USER% --password-stdin"
           bat "docker push ${env.BE_TAG}"
           bat "docker push ${env.FE_TAG}"
-          script {
-            def BR = env.BRANCH_NAME ?: 'main'
-            if (BR == 'main') {
-              bat "docker push ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_BACKEND}:latest"
-              bat "docker push ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:latest"
-            }
-          }
         }
       }
     }
