@@ -8,8 +8,10 @@ pipeline {
   }
 
   environment {
-    // 레지스트리 URL을 문자열로 지정하세요. 예: 'docker.io/your_account' 또는 'registry.example.com'
-    REGISTRY_URL = 'docker.io/minsik023'
+    // 레지스트리 호스트와 리포지토리 네임스페이스를 분리해 관리합니다.
+    // 로그인은 호스트로만 수행하고, 태깅은 호스트/네임스페이스/이미지로 구성합니다.
+    REGISTRY_HOST = 'docker.io'
+    REPO_PREFIX  = 'minsik023'
     IMAGE_BACKEND = 'weather-backend'
     IMAGE_FRONTEND = 'weather-frontend'
     GIT_SHA = "${env.GIT_COMMIT ?: env.BUILD_TAG}"
@@ -51,13 +53,14 @@ pipeline {
     stage('Docker Build') {
       steps {
         script {
-          def beTag = "${REGISTRY_URL}/${IMAGE_BACKEND}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-          def feTag = "${REGISTRY_URL}/${IMAGE_FRONTEND}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+          def BR = env.BRANCH_NAME ?: 'main'
+          def beTag = "${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_BACKEND}:${BR}-${env.BUILD_NUMBER}"
+          def feTag = "${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:${BR}-${env.BUILD_NUMBER}"
           bat "docker build -t ${beTag} backend"
           bat "docker build -t ${feTag} frontend"
-          if (env.BRANCH_NAME == 'main') {
-            bat "docker tag ${beTag} ${REGISTRY_URL}/${IMAGE_BACKEND}:latest"
-            bat "docker tag ${feTag} ${REGISTRY_URL}/${IMAGE_FRONTEND}:latest"
+          if (BR == 'main') {
+            bat "docker tag ${beTag} ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_BACKEND}:latest"
+            bat "docker tag ${feTag} ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:latest"
           }
           env.BE_TAG = beTag
           env.FE_TAG = feTag
@@ -68,13 +71,15 @@ pipeline {
     stage('Docker Push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-registry-cred', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-          bat "echo %REG_PASS% | docker login ${REGISTRY_URL} -u %REG_USER% --password-stdin"
+          // Docker Hub 로그인: 호스트로만 로그인해야 합니다 (네임스페이스 포함 금지)
+          bat "echo %REG_PASS% | docker login ${REGISTRY_HOST} -u %REG_USER% --password-stdin"
           bat "docker push ${env.BE_TAG}"
           bat "docker push ${env.FE_TAG}"
           script {
-            if (env.BRANCH_NAME == 'main') {
-              bat "docker push ${REGISTRY_URL}/${IMAGE_BACKEND}:latest"
-              bat "docker push ${REGISTRY_URL}/${IMAGE_FRONTEND}:latest"
+            def BR = env.BRANCH_NAME ?: 'main'
+            if (BR == 'main') {
+              bat "docker push ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_BACKEND}:latest"
+              bat "docker push ${REGISTRY_HOST}/${REPO_PREFIX}/${IMAGE_FRONTEND}:latest"
             }
           }
         }
