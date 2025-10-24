@@ -4,7 +4,7 @@ import ForecastList from '../components/ForecastList'
 import WeatherIcon from '../components/WeatherIcon'
 import DailySummary from '../components/DailySummary'
 import TempChart from '../components/TempChart'
-import { isAuthenticated, getUserName } from '../auth'
+import { isAuthenticated, getUserName, clearAccessToken } from '../auth'
 import { consumeFlash } from '../flash'
 import { useNavigate } from 'react-router-dom'
 import BrandBar from '../components/BrandBar'
@@ -54,7 +54,7 @@ export default function MainPage() {
     nav('/login')
   }
   const onLogout = () => {
-    localStorage.removeItem('accessToken')
+    clearAccessToken()
     setUserName(null)
     setNotice('로그아웃되었습니다.')
   }

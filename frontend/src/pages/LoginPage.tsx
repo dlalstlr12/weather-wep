@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
+import { setAccessToken } from '../auth'
 import { useNavigate, Link } from 'react-router-dom'
 import BrandBar from '../components/BrandBar'
 import { setFlash, consumeFlash } from '../flash'
@@ -28,7 +29,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password })
       })
       if (res?.accessToken) {
-        localStorage.setItem('accessToken', res.accessToken)
+        setAccessToken(res.accessToken)
         setFlash('로그인되었습니다.')
         nav('/', { replace: true })
       } else {

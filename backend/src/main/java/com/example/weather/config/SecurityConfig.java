@@ -37,7 +37,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/actuator/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/chat/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/weather/**").permitAll()
                 .anyRequest().authenticated()
             )

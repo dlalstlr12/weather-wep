@@ -3,12 +3,10 @@ import MainPage from './pages/MainPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import ChatPage from './pages/ChatPage'
-
-function isAuthenticated() {
-  return !!localStorage.getItem('accessToken')
-}
+import { useAuth } from './auth'
 
 export default function AppRoutes() {
+  const authed = useAuth()
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
@@ -16,7 +14,7 @@ export default function AppRoutes() {
       <Route path="/signup" element={<SignupPage />} />
       <Route
         path="/chat"
-        element={isAuthenticated() ? <ChatPage /> : <Navigate to="/login" replace />}
+        element={authed ? <ChatPage /> : <Navigate to="/login" replace />}
       />
     </Routes>
   )
