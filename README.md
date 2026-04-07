@@ -2,6 +2,9 @@
 
 직관적인 날씨 조회와 지도 탐색, 간단한 날씨 대화(챗)를 제공하는 풀스택 프로젝트입니다. 프론트는 Cloudflare Pages, 백엔드는 Render, 데이터베이스는 Railway(MySQL)로 배포되었습니다. 포트폴리오 목적의 실전형 CI/CD 및 멀티 플랫폼 배포 구성을 포함합니다.
 
+## 프로젝트 노션 링크
+- https://aback-may-a76.notion.site/
+
 ## 라이브 링크
 - 프론트엔드: https://weather-wep.pages.dev
 - 백엔드 API: https://weather-wep.onrender.com
