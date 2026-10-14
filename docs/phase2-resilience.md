@@ -61,3 +61,4 @@ Phase 0, 1과 같다 (한 PC, 백엔드 `java -jar`, MySQL·k6는 Docker, 기상
 - 서킷 브레이커 상태 전이는 로그로만 남는다. 지표는 Phase 6에서 추가한다.
 
 원본 수치: `perf/results/phase2-*.json`(run1), `phase2-r2-*.json`(run2), 업스트림 호출 수는 `*.upstream.json`.
+run1의 resultCode 시나리오 원본 파일은 작업 중 실수로 삭제해 저장소에 없다. 위 표의 해당 값(요청 3,044건, 업스트림 133회)은 측정 직후 출력한 요약에서 옮긴 것이다.
