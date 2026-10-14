@@ -1,0 +1,22 @@
+rows: 3836
+
+== 인덱스 있음 (GiST + trigram GIN)
+  이름 검색 '역삼' (ILIKE): median 2.603 ms, 계획 Seq Scan
+  반경 5km, 서울 (ST_DWithin): median 0.245 ms, 계획 Bitmap Heap Scan / Bitmap Index Scan
+  반경 5km, 인제 (ST_DWithin): median 0.046 ms, 계획 Index Scan
+  가장 가까운 1곳, 서울 (KNN): median 0.160 ms, 계획 Index Scan
+  가장 가까운 1곳, 인제 (KNN): median 0.057 ms, 계획 Index Scan
+
+== 인덱스 없음
+  이름 검색 '역삼' (ILIKE): median 2.381 ms, 계획 Seq Scan
+  반경 5km, 서울 (ST_DWithin): median 5.311 ms, 계획 Seq Scan
+  반경 5km, 인제 (ST_DWithin): median 6.059 ms, 계획 Seq Scan
+  가장 가까운 1곳, 서울 (KNN): median 4.088 ms, 계획 Seq Scan
+  가장 가까운 1곳, 인제 (KNN): median 6.064 ms, 계획 Seq Scan
+
+== 요약 (median ms): 인덱스 없음 -> 있음
+  이름 검색 '역삼' (ILIKE): 2.381 -> 2.603 ms (0.9배), Seq Scan -> Seq Scan
+  반경 5km, 서울 (ST_DWithin): 5.311 -> 0.245 ms (21.7배), Seq Scan -> Bitmap Heap Scan / Bitmap Index Scan
+  반경 5km, 인제 (ST_DWithin): 6.059 -> 0.046 ms (131.7배), Seq Scan -> Index Scan
+  가장 가까운 1곳, 서울 (KNN): 4.088 -> 0.160 ms (25.6배), Seq Scan -> Index Scan
+  가장 가까운 1곳, 인제 (KNN): 6.064 -> 0.057 ms (106.4배), Seq Scan -> Index Scan

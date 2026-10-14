@@ -1,0 +1,8 @@
+행 수: 1,000,000
+  반경 5km 검색 (ST_DWithin): median 567.53 ms, min 560.17 ms, 계획 Seq Scan
+  가장 가까운 5개 (KNN, <->): median 232.60 ms, min 223.31 ms, 계획 Seq Scan
+  반경 5km 검색 (ST_DWithin): median 0.60 ms, min 0.51 ms, 계획 Bitmap Heap Scan / Bitmap Index Scan
+  가장 가까운 5개 (KNN, <->): median 0.20 ms, min 0.15 ms, 계획 Index Scan
+== 요약 (median ms)
+  반경 5km 검색 (ST_DWithin): 567.53 -> 0.60 ms (940배), Seq Scan -> Bitmap Heap Scan / Bitmap Index Scan
+  가장 가까운 5개 (KNN, <->): 232.60 -> 0.20 ms (1163배), Seq Scan -> Index Scan

@@ -15,7 +15,7 @@ public class WeatherService {
 
     public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city, boolean nocache) {
         LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
-        KmaResult<Map<String, String>> result = kmaClient.getUltraNowcast(loc.lat(), loc.lon(), nocache);
+        KmaResult<Map<String, String>> result = kmaClient.getUltraNowcast(loc.grid(), nocache);
         Map<String, String> now = result.value();
 
         // 실황: T1H/RN1, 예보: TMP/PCP
@@ -28,7 +28,7 @@ public class WeatherService {
 
     public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city, boolean nocache) {
         LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
-        KmaResult<java.util.List<Map<String, String>>> result = kmaClient.getVilageForecast(loc.lat(), loc.lon(), nocache);
+        KmaResult<java.util.List<Map<String, String>>> result = kmaClient.getVilageForecast(loc.grid(), nocache);
         var list = result.value();
         java.util.List<WeatherDtos.ForecastEntry> items = new java.util.ArrayList<>();
         for (var m : list) {
