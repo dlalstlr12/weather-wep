@@ -37,8 +37,8 @@
       <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.mysql</groupId>
-      <artifactId>mysql-connector-j</artifactId>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -98,9 +98,24 @@
       <artifactId>caffeine</artifactId>
     </dependency>
     <dependency>
-    <groupId>org.flywaydb</groupId>
-    <artifactId>flyway-mysql</artifactId>
-</dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -108,6 +123,18 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- 통합 테스트(@SpringBootTest)가 필수 환경변수 없이 기동하도록 테스트용 값을 준다 -->
+          <environmentVariables>
+            <JWT_SECRET>test-secret-test-secret-test-secret-1234567890</JWT_SECRET>
+            <SPRING_DATASOURCE_USERNAME>test</SPRING_DATASOURCE_USERNAME>
+            <SPRING_DATASOURCE_PASSWORD>test</SPRING_DATASOURCE_PASSWORD>
+          </environmentVariables>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
