@@ -17,8 +17,8 @@ spring:
     name: weather-backend
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/weather_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:0000}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 5
@@ -46,11 +46,8 @@ logging:
     org.hibernate.SQL: INFO
 
 jwt:
-  secret: ${JWT_SECRET:change-this-in-env}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
-
-kay:
-  note: "Do not commit real secrets."
 
 huggingface:
   api-base: http://localhost:11434/v1/chat/completions
