@@ -96,7 +96,7 @@ class KmaSlotFallbackAndStaleTest {
     @Test
     void failedRefreshServesTheOldValueAsStaleThroughTheWeatherService() {
         wm.stubFor(get(urlPathEqualTo(ULTRA)).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
-        WeatherService service = new WeatherService(client(new KmaProperties.Cache(60, 10800, 100)), new LocationResolver());
+        WeatherService service = new WeatherService(client(new KmaProperties.Cache(60, 10800, 100)), new LocationResolver(org.mockito.Mockito.mock(com.example.weather.location.LocationRepository.class)));
 
         WeatherDtos.CurrentWeatherResponse fresh = service.getCurrent(37.5665, 126.9780, null, false);
         assertFalse(fresh.stale());

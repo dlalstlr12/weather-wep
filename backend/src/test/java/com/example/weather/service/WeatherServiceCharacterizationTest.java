@@ -27,7 +27,7 @@ class WeatherServiceCharacterizationTest {
         wm.resetAll();
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
-        service = new WeatherService(KmaFixtures.client(wm.baseUrl()), new LocationResolver());
+        service = new WeatherService(KmaFixtures.client(wm.baseUrl()), new LocationResolver(org.mockito.Mockito.mock(com.example.weather.location.LocationRepository.class)));
     }
 
     @Test

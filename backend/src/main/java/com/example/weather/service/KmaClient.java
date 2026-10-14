@@ -43,8 +43,11 @@ public class KmaClient {
     }
 
     public KmaResult<List<Map<String, String>>> getVilageForecast(double lat, double lon, boolean nocache) {
+        return getVilageForecast(KmaGridConverter.toGrid(lat, lon), nocache);
+    }
+
+    public KmaResult<List<Map<String, String>>> getVilageForecast(KmaGridConverter.Grid grid, boolean nocache) {
         requireServiceKey();
-        KmaGridConverter.Grid grid = KmaGridConverter.toGrid(lat, lon);
         KmaBaseTime.Base base = baseTime.vilage();
         return cache.get(cacheKey("vilage", grid, base), nocache,
                 () -> loadWithPreviousSlotFallback(base, KmaBaseTime::previousVilage,
@@ -52,8 +55,11 @@ public class KmaClient {
     }
 
     public KmaResult<Map<String, String>> getUltraNowcast(double lat, double lon, boolean nocache) {
+        return getUltraNowcast(KmaGridConverter.toGrid(lat, lon), nocache);
+    }
+
+    public KmaResult<Map<String, String>> getUltraNowcast(KmaGridConverter.Grid grid, boolean nocache) {
         requireServiceKey();
-        KmaGridConverter.Grid grid = KmaGridConverter.toGrid(lat, lon);
         // 허브는 초단기실황 대신 단기예보 응답을 쓴다
         boolean hub = api.isHub();
         KmaBaseTime.Base base = hub ? baseTime.vilage() : baseTime.ultra();
