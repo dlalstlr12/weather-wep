@@ -16,7 +16,7 @@ class ForecastSelectorTest {
     private static final DateTimeFormatter F = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private static String dt(int plusDays, int hour) {
-        LocalDate d = LocalDate.now(ZoneId.systemDefault()).plusDays(plusDays);
+        LocalDate d = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(plusDays);
         return d.format(F) + String.format("%02d00", hour);
     }
 
@@ -56,5 +56,13 @@ class ForecastSelectorTest {
     void whenTargetDayMissingFallsBackToFirstItem() {
         var fr = resp(entry(dt(0, 12), 10), entry(dt(0, 15), 10));
         assertEquals(0, ForecastSelector.chooseIndex(fr, "모레 날씨"));
+    }
+
+    @Test
+    void usesTheDateOfTheGivenClock() {
+        // 2026-10-14T16:30Z = 서울 시간 2026-10-15 01:30. 서울 시계 기준 '오늘'은 10/15 이다.
+        var seoulClock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-14T16:30:00Z"), ZoneId.of("Asia/Seoul"));
+        var fr = resp(entry("202610141200", 10), entry("202610151200", 10));
+        assertEquals(1, ForecastSelector.chooseIndex(fr, "날씨", seoulClock));
     }
 }
