@@ -13,6 +13,14 @@
 bash perf/run-baseline.sh <label> [시나리오]   # ok|http500|resultcode|malformed|delay5s|stampede
 ```
 
+## 시나리오마다 백엔드를 새로 띄워 측정 (Phase 2 이후)
+서킷 브레이커와 캐시 상태가 다음 시나리오로 넘어가면 결과가 오염되므로 시나리오마다 백엔드를 재시작한다.
+```bash
+export SPRING_DATASOURCE_URL=... SPRING_DATASOURCE_USERNAME=... SPRING_DATASOURCE_PASSWORD=... JWT_SECRET=... KMA_SERVICE_KEY=test-key
+bash perf/run-isolated.sh <label> --kma.cache.ttl-seconds=2   # stale-outage 시나리오에 필요
+```
+시나리오: `ok http500 resultcode malformed delay5s stampede stale-outage`. 업스트림(WireMock) 호출 수는 `perf/results/<label>-<시나리오>.upstream.json`.
+
 ## 실행 예
 ```bash
 python perf/setup_wiremock.py delay5s

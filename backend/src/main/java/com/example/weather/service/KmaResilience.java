@@ -8,11 +8,13 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import java.time.Duration;
 import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 기상청 호출 한 번을 재시도(Retry)와 서킷 브레이커로 감싼다.
  * 재시도가 바깥, 서킷 브레이커가 안쪽이라 시도마다 브레이커에 기록되고, 브레이커가 열리면 재시도하지 않고 바로 실패한다.
  */
+@Slf4j
 final class KmaResilience {
 
     private final Retry retry;
@@ -34,6 +36,8 @@ final class KmaResilience {
                 .recordException(e -> !(e instanceof KmaApiException k) || k.countsAsUpstreamFailure())
                 .ignoreExceptions(CallNotPermittedException.class)
                 .build());
+        this.breaker.getEventPublisher().onStateTransition(
+                e -> log.warn("기상청 서킷 브레이커 상태 전이: {}", e.getStateTransition()));
     }
 
     <T> T call(Supplier<T> supplier) {
