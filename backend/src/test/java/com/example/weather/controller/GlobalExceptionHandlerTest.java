@@ -48,6 +48,33 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void unreachableBecomes503() throws Exception {
+        when(weather.getCurrent(any(), any(), any(), anyBoolean()))
+                .thenThrow(new KmaApiException(KmaApiException.Kind.UNREACHABLE, "timeout", null, null));
+        mvc.perform(get("/api/weather/current").param("lat", "37.5").param("lon", "127.0"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.kind").value("UNREACHABLE"));
+    }
+
+    @Test
+    void openBreakerBecomes503() throws Exception {
+        when(weather.getCurrent(any(), any(), any(), anyBoolean()))
+                .thenThrow(new KmaApiException(KmaApiException.Kind.CIRCUIT_OPEN, "open", null, null));
+        mvc.perform(get("/api/weather/current").param("lat", "37.5").param("lon", "127.0"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.kind").value("CIRCUIT_OPEN"));
+    }
+
+    @Test
+    void noDataBecomes502() throws Exception {
+        when(weather.getCurrent(any(), any(), any(), anyBoolean()))
+                .thenThrow(new KmaApiException(KmaApiException.Kind.NO_DATA, "no data", "03", null));
+        mvc.perform(get("/api/weather/current").param("lat", "37.5").param("lon", "127.0"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.kind").value("NO_DATA"));
+    }
+
+    @Test
     void unexpectedExceptionBecomes500WithoutLeakingInternals() throws Exception {
         when(weather.getCurrent(any(), any(), any(), anyBoolean())).thenThrow(new IllegalStateException("db password=secret"));
         mvc.perform(get("/api/weather/current").param("lat", "37.5").param("lon", "127.0"))

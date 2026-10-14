@@ -56,6 +56,23 @@ huggingface:
 
 kma:
   service-key: ${KMA_SERVICE_KEY:}
+  # 연결/응답 대기 제한(ms). 이 시간 안에 응답이 없으면 끊고 재시도 또는 오류 처리한다
+  http:
+    connect-timeout-ms: 1000
+    read-timeout-ms: 2000
+  # ttl 안에는 캐시를 그대로 쓰고, 갱신에 실패하면 stale-max까지는 지난 값을 대신 준다
+  cache:
+    ttl-seconds: 600
+    stale-max-seconds: 10800
+    max-size: 1000
+  # 재시도는 첫 시도를 포함한 총 횟수. 서킷 브레이커는 최근 window-size개 호출 중 실패율이 기준을 넘으면 open-ms 동안 호출을 막는다
+  resilience:
+    retry-max-attempts: 2
+    retry-wait-ms: 200
+    breaker-window-size: 20
+    breaker-minimum-calls: 10
+    breaker-failure-rate-percent: 50
+    breaker-open-ms: 10000
   # provider: data (기본, data.go.kr) | hub (기상청 API Hub)
   provider: hub
   # data.go.kr 기본 base-url (사용 중인 엔드포인트)

@@ -34,7 +34,7 @@ class KmaClientCharacterizationTest {
     @Test
     void ultraNowcastIsParsedIntoCategoryMap() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_OK)));
-        Map<String, String> r = client().getUltraNowcast(37.5665, 126.9780, true);
+        Map<String, String> r = client().getUltraNowcast(37.5665, 126.9780, true).value();
         assertEquals("18.5", r.get("T1H"));
         assertEquals("0", r.get("RN1"));
         assertEquals("55", r.get("REH"));
@@ -43,7 +43,7 @@ class KmaClientCharacterizationTest {
     @Test
     void vilageForecastIsGroupedByDateTime() {
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
-        List<Map<String, String>> r = client().getVilageForecast(37.5665, 126.9780, true);
+        List<Map<String, String>> r = client().getVilageForecast(37.5665, 126.9780, true).value();
         assertEquals(2, r.size());
         Map<String, String> noon = r.stream().filter(m -> "202610141200".equals(m.get("dateTime"))).findFirst().orElseThrow();
         assertEquals("20", noon.get("TMP"));
@@ -121,8 +121,8 @@ class KmaClientCharacterizationTest {
     @Test
     void hubProviderSendsKeyInHeaderAndUsesVilageEndpointForNowcast() {
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
-        KmaClient hub = new KmaClient("hub-key", "hub", "http://unused", wm.baseUrl(), "header", "x-api-key", "serviceKey");
-        Map<String, String> r = hub.getUltraNowcast(37.5665, 126.9780, true);
+        KmaClient hub = new KmaClient(KmaFixtures.hubProps(wm.baseUrl(), "header", "serviceKey"));
+        Map<String, String> r = hub.getUltraNowcast(37.5665, 126.9780, true).value();
         assertEquals("18.5", r.get("T1H"));
         wm.verify(getRequestedFor(urlPathEqualTo("/getVilageFcst")).withHeader("x-api-key", equalTo("hub-key")));
     }
@@ -130,25 +130,29 @@ class KmaClientCharacterizationTest {
     @Test
     void hubProviderCanSendKeyAsQueryParam() {
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
-        KmaClient hub = new KmaClient("hub-key", "hub", "http://unused", wm.baseUrl(), "query", "x-api-key", "authKey");
+        KmaClient hub = new KmaClient(KmaFixtures.hubProps(wm.baseUrl(), "query", "authKey"));
         hub.getVilageForecast(37.5665, 126.9780, true);
         wm.verify(getRequestedFor(urlPathEqualTo("/getVilageFcst")).withQueryParam("authKey", equalTo("hub-key")));
     }
 
+    /** Phase 2 변경: 읽기 타임아웃이 있어 업스트림이 느려도 설정한 시간(1초) 안에 끊는다 (Phase 0에서는 지연 전체를 기다렸다). */
     @Test
-    void noTimeoutTheCallerBlocksForTheWholeUpstreamDelay() {
+    void slowUpstreamIsCutOffAtTheReadTimeout() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst"))
-                .willReturn(okJson(KmaFixtures.ULTRA_OK).withFixedDelay(2000)));
+                .willReturn(okJson(KmaFixtures.ULTRA_OK).withFixedDelay(3000)));
         long t0 = System.nanoTime();
-        client().getUltraNowcast(37.5665, 126.9780, true);
+        KmaApiException e = assertThrows(KmaApiException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
         long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
-        // 현재 동작: 읽기 타임아웃이 없어 업스트림이 느린 만큼 그대로 기다린다
-        assertTrue(elapsedMs >= 1900, "elapsed=" + elapsedMs);
+        assertEquals(KmaApiException.Kind.UNREACHABLE, e.kind());
+        assertTrue(elapsedMs < 2000, "elapsed=" + elapsedMs);
     }
 
     @Test
     void blankServiceKeyFailsFast() {
-        KmaClient c = new KmaClient("", "data", wm.baseUrl(), "http://unused", "header", "x-api-key", "serviceKey");
+        KmaProperties blank = new KmaProperties("", "data", new KmaProperties.Data(wm.baseUrl()), KmaFixtures.props(wm.baseUrl()).hub(),
+                new KmaProperties.Http(500, 1000), new KmaProperties.Cache(600, 10800, 1000),
+                new KmaProperties.Resilience(1, 10, 100, 100, 50f, 1000));
+        KmaClient c = new KmaClient(blank);
         assertThrows(IllegalStateException.class, () -> c.getUltraNowcast(37.5665, 126.9780, true));
     }
 }

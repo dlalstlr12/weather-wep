@@ -15,18 +15,21 @@ public class WeatherService {
 
     public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city, boolean nocache) {
         LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
-        Map<String, String> now = kmaClient.getUltraNowcast(loc.lat(), loc.lon(), nocache);
+        KmaResult<Map<String, String>> result = kmaClient.getUltraNowcast(loc.lat(), loc.lon(), nocache);
+        Map<String, String> now = result.value();
 
         // 실황: T1H/RN1, 예보: TMP/PCP
         String t = firstNonNull(now.get("T1H"), now.get("TMP"));
         String p = firstNonNull(now.get("RN1"), now.get("PCP"));
         return new WeatherDtos.CurrentWeatherResponse(
-                parseDoubleSafe(t), normalizePrecipitation(p), KmaClient.skyCodeToText(now.get("SKY")));
+                parseDoubleSafe(t), normalizePrecipitation(p), KmaClient.skyCodeToText(now.get("SKY")),
+                result.stale(), result.ageSeconds());
     }
 
     public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city, boolean nocache) {
         LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
-        var list = kmaClient.getVilageForecast(loc.lat(), loc.lon(), nocache);
+        KmaResult<java.util.List<Map<String, String>>> result = kmaClient.getVilageForecast(loc.lat(), loc.lon(), nocache);
+        var list = result.value();
         java.util.List<WeatherDtos.ForecastEntry> items = new java.util.ArrayList<>();
         for (var m : list) {
             String t = firstNonNull(m.get("TMP"), m.get("T1H"));
@@ -40,7 +43,7 @@ public class WeatherService {
                     parseIntSafe(m.get("REH")),
                     parseDoubleSafe(m.get("WSD"))));
         }
-        return new WeatherDtos.ForecastResponse(items);
+        return new WeatherDtos.ForecastResponse(items, result.stale(), result.ageSeconds());
     }
 
     private static Double parseDoubleSafe(String v) {

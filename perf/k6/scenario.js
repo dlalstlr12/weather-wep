@@ -4,6 +4,10 @@
 // stampede 모드: 같은 (캐시 비어 있는) 키를 VUS명이 동시에 1번씩 호출
 import http from 'k6/http';
 import { sleep } from 'k6';
+import { Counter } from 'k6/metrics';
+
+const staleResponses = new Counter('stale_responses');
+const okResponses = new Counter('ok_responses');
 
 const BASE = __ENV.BASE || 'http://host.docker.internal:8080';
 const MODE = __ENV.MODE || 'load';
@@ -31,7 +35,11 @@ export const options = {
 };
 
 export function load() {
-  http.get(`${BASE}/api/weather/current?${QS}`, { timeout: '120s' });
+  const r = http.get(`${BASE}/api/weather/current?${QS}`, { timeout: '120s' });
+  if (r.status === 200) {
+    okResponses.add(1);
+    try { if (r.json('stale') === true) staleResponses.add(1); } catch (e) { /* 본문이 JSON이 아니면 무시 */ }
+  }
 }
 
 export function probe() {

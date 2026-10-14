@@ -24,8 +24,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(KmaApiException.class)
     ProblemDetail upstream(KmaApiException e) {
         log.warn("기상청 호출 실패 kind={} resultCode={} message={}", e.kind(), e.resultCode(), e.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, "기상청 데이터를 가져오지 못했습니다.");
-        pd.setTitle("기상청 응답 오류");
+        // 연결 불가와 서킷 브레이커 차단은 일시적 불가(503), 응답은 받았지만 쓸 수 없는 경우는 502
+        boolean unavailable = e.kind() == KmaApiException.Kind.UNREACHABLE || e.kind() == KmaApiException.Kind.CIRCUIT_OPEN;
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+                unavailable ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY, "기상청 데이터를 가져오지 못했습니다.");
+        pd.setTitle(unavailable ? "기상청 일시 이용 불가" : "기상청 응답 오류");
         pd.setProperty("kind", e.kind().name());
         return pd;
     }

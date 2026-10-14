@@ -12,6 +12,7 @@ final class KmaBaseTime {
     private static final int[] VILAGE_HOURS = {2, 5, 8, 11, 14, 17, 20, 23};
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH");
+    private static final DateTimeFormatter DATE_HOUR = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
     private final Clock clock;
 
@@ -39,5 +40,22 @@ final class KmaBaseTime {
         }
         candidate = chosen == -1 ? candidate.minusDays(1).withHour(23) : candidate.withHour(chosen);
         return new Base(candidate.format(DATE), candidate.format(HOUR) + "00");
+    }
+
+    /** base 바로 앞 단기예보 발표 슬롯 (02시 앞은 전날 23시) */
+    static Base previousVilage(Base base) {
+        LocalDateTime t = LocalDateTime.parse(base.date() + base.time().substring(0, 2), DATE_HOUR);
+        int prev = -1;
+        for (int h : VILAGE_HOURS) {
+            if (h < t.getHour()) prev = h;
+        }
+        LocalDateTime p = prev == -1 ? t.minusDays(1).withHour(23) : t.withHour(prev);
+        return new Base(p.format(DATE), p.format(HOUR) + "00");
+    }
+
+    /** base 바로 앞 초단기실황 슬롯 (한 시간 전의 30분) */
+    static Base previousUltra(Base base) {
+        LocalDateTime t = LocalDateTime.parse(base.date() + base.time().substring(0, 2), DATE_HOUR).minusHours(1);
+        return new Base(t.format(DATE), t.format(HOUR) + "30");
     }
 }

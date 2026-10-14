@@ -93,6 +93,17 @@ class ChatServiceCharacterizationTest {
     }
 
     @Test
+    void staleWeatherIsAnnouncedWithItsAge() {
+        when(weather.getCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("서울"), org.mockito.ArgumentMatchers.eq(false)))
+                .thenReturn(new WeatherDtos.CurrentWeatherResponse(10.0, 0.0, "맑음", true, 300));
+        String out = chat.chat(ask("서울 지금 날씨")).content();
+        assertTrue(out.contains("10.0°C"));
+        assertTrue(out.contains("5분 전 데이터"));
+        verifyNoInteractions(hf);
+    }
+
+    @Test
     void nonWeatherQuestionGoesToLlm() {
         when(hf.generate(anyString())).thenReturn("안녕하세요");
         assertEquals("안녕하세요", chat.chat(ask("안녕")).content());

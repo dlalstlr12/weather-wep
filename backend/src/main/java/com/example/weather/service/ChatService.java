@@ -61,9 +61,19 @@ public class ChatService {
 
         String answer() {
             if (failed) return null;
-            return current != null
+            String text = current != null
                     ? NlgFormatter.formatCurrent(current, q.city())
                     : NlgFormatter.formatForecast(forecast, q.city(), q.text(), forecastIndex);
+            if (text != null && stale()) text += " (기상청 갱신에 실패해 " + (ageSeconds() / 60) + "분 전 데이터로 안내합니다.)";
+            return text;
+        }
+
+        private boolean stale() {
+            return current != null ? current.stale() : forecast != null && forecast.stale();
+        }
+
+        private long ageSeconds() {
+            return current != null ? current.ageSeconds() : forecast.ageSeconds();
         }
 
         /** LLM 프롬프트에 넣을 한 줄 요약 */

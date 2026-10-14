@@ -373,6 +373,11 @@ export default function MainPage() {
                 <div style={{ fontWeight: 600 }}>{weather.precipitation ?? '-'} mm</div>
               </div>
             </div>
+            {weather.stale && (
+              <p className="muted" style={{ margin: '8px 0 0' }}>
+                기상청 갱신에 실패해 {Math.floor((weather.ageSeconds ?? 0) / 60)}분 전 데이터를 보여드리고 있어요.
+              </p>
+            )}
           </div>
         )}
         {forecast && forecast.length > 0 && (

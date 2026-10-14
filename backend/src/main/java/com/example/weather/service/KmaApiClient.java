@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -16,7 +17,7 @@ import org.springframework.web.client.RestClientException;
 @Slf4j
 final class KmaApiClient {
 
-    private final RestClient http = RestClient.create();
+    private final RestClient http;
     private final String serviceKey;
     private final boolean hub;
     private final String dataBaseUrl;
@@ -25,15 +26,18 @@ final class KmaApiClient {
     private final String hubHeaderName;
     private final String hubQueryName;
 
-    KmaApiClient(String serviceKey, String provider, String dataBaseUrl, String hubBaseUrl,
-                 String hubAuthMode, String hubHeaderName, String hubQueryName) {
-        this.serviceKey = serviceKey;
-        this.hub = "hub".equalsIgnoreCase(provider);
-        this.dataBaseUrl = dataBaseUrl;
-        this.hubBaseUrl = hubBaseUrl;
-        this.hubAuthMode = hubAuthMode;
-        this.hubHeaderName = hubHeaderName;
-        this.hubQueryName = hubQueryName;
+    KmaApiClient(KmaProperties p) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(p.http().connectTimeoutMs());
+        factory.setReadTimeout(p.http().readTimeoutMs());
+        this.http = RestClient.builder().requestFactory(factory).build();
+        this.serviceKey = p.serviceKey();
+        this.hub = "hub".equalsIgnoreCase(p.provider());
+        this.dataBaseUrl = p.data().baseUrl();
+        this.hubBaseUrl = p.hub().baseUrl();
+        this.hubAuthMode = p.hub().auth().mode();
+        this.hubHeaderName = p.hub().auth().headerName();
+        this.hubQueryName = p.hub().auth().queryName();
     }
 
     boolean isHub() {
@@ -66,7 +70,8 @@ final class KmaApiClient {
                         // 메시지·로그에 URL을 넣지 않는다 (쿼리에 서비스키가 들어 있음)
                         log.warn("KMA HTTP {} endpoint={}", res.getStatusCode().value(), endpoint);
                         throw new KmaApiException(KmaApiException.Kind.HTTP_ERROR,
-                                "KMA 호출 실패: HTTP " + res.getStatusCode() + " (endpoint=" + endpoint + ")", null, null);
+                                "KMA 호출 실패: HTTP " + res.getStatusCode() + " (endpoint=" + endpoint + ")",
+                                null, res.getStatusCode().value(), null);
                     })
                     .body(Map.class);
         } catch (ResourceAccessException e) {

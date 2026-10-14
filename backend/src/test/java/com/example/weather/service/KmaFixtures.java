@@ -1,6 +1,8 @@
 package com.example.weather.service;
 
-/** 기상청 응답 모양의 테스트 픽스처와 KmaClient 생성 헬퍼. */
+import java.time.Clock;
+
+/** 기상청 응답 모양의 테스트 픽스처와 KmaClient/KmaProperties 생성 헬퍼. */
 final class KmaFixtures {
     private KmaFixtures() {}
 
@@ -34,11 +36,37 @@ final class KmaFixtures {
              ]}}}}
             """;
 
-    static final String RESULT_CODE_ERROR = """
-            {"response":{"header":{"resultCode":"22","resultMsg":"LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR"}}}
-            """;
+    static final String RESULT_CODE_ERROR = resultCode("22", "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR");
 
-    static KmaClient client(String baseUrl) {
-        return new KmaClient("test-key", "data", baseUrl, "http://unused", "header", "x-api-key", "serviceKey");
+    static String resultCode(String code, String msg) {
+        return "{\"response\":{\"header\":{\"resultCode\":\"" + code + "\",\"resultMsg\":\"" + msg + "\"}}}";
+    }
+
+    /** 테스트 기본값: 빠른 타임아웃, 재시도 없음, 서킷 브레이커는 사실상 비활성 */
+    static KmaProperties props(String dataBaseUrl) {
+        return props(dataBaseUrl, new KmaProperties.Http(500, 1000), new KmaProperties.Cache(600, 10800, 1000),
+                new KmaProperties.Resilience(1, 10, 100, 100, 50f, 1000));
+    }
+
+    static KmaProperties props(String dataBaseUrl, KmaProperties.Http http, KmaProperties.Cache cache,
+                               KmaProperties.Resilience resilience) {
+        return new KmaProperties("test-key", "data", new KmaProperties.Data(dataBaseUrl),
+                new KmaProperties.Hub("http://unused", new KmaProperties.Auth("header", "x-api-key", "serviceKey")),
+                http, cache, resilience);
+    }
+
+    static KmaProperties hubProps(String hubBaseUrl, String authMode, String queryName) {
+        return new KmaProperties("hub-key", "hub", new KmaProperties.Data("http://unused"),
+                new KmaProperties.Hub(hubBaseUrl, new KmaProperties.Auth(authMode, "x-api-key", queryName)),
+                new KmaProperties.Http(500, 1000), new KmaProperties.Cache(600, 10800, 1000),
+                new KmaProperties.Resilience(1, 10, 100, 100, 50f, 1000));
+    }
+
+    static KmaClient client(String dataBaseUrl) {
+        return new KmaClient(props(dataBaseUrl));
+    }
+
+    static KmaClient client(KmaProperties props, Clock clock) {
+        return new KmaClient(props, clock);
     }
 }
