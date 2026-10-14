@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 요청의 좌표/도시명을 조회할 위치 하나로 정한다.
- * 좌표가 있으면 좌표를 쓰고, 없으면 위치 테이블에서 이름으로 찾는다. 위치 테이블에서 찾지 못하면 주요 도시 11곳(GeoService)을 쓴다.
+ * 좌표가 있으면 좌표를 쓰고, 없으면 위치 테이블(기상청 행정구역 격자 3,836곳)에서 이름으로 찾는다.
  */
 @Component
 public class LocationResolver {
@@ -38,11 +38,7 @@ public class LocationResolver {
                 Place p = place.get();
                 return new Location(p.lat(), p.lon(), p.nx(), p.ny(), p.fullName());
             }
-            double[] c = GeoService.geocode(city);
-            if (c == null) {
-                throw new IllegalArgumentException("지원하지 않는 도시입니다: " + city.trim());
-            }
-            return new Location(c[0], c[1]);
+            throw new IllegalArgumentException("찾을 수 없는 지역입니다: " + city.trim());
         }
         throw new IllegalArgumentException("위치 정보(lat, lon 또는 city)가 필요합니다.");
     }

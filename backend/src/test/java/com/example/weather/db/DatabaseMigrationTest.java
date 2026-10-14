@@ -25,8 +25,8 @@ class DatabaseMigrationTest extends PostgisIntegrationTest {
     void migrationsAreAppliedInOrderWithoutFailures() {
         List<String> versions = jdbc.queryForList(
                 "select version from flyway_schema_history where success order by installed_rank", String.class);
-        assertTrue(versions.size() >= 3, versions.toString());
-        assertEquals(List.of("1", "2", "3"), versions.subList(0, 3));
+        assertTrue(versions.size() >= 4, versions.toString());
+        assertEquals(List.of("1", "2", "3", "4"), versions.subList(0, 4));
     }
 
     @Test

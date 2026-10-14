@@ -26,12 +26,12 @@ public class LocationRepository {
         this.jdbc = jdbc;
     }
 
-    /** 이름 일부로 검색. 이름이 짧은 것(시·도 같은 상위 행정구역)을 먼저 돌려준다. */
+    /** 이름 일부로 검색. 상위 행정구역(시·도, 시·군·구)을 먼저, 같은 단계에서는 이름이 짧은 것을 먼저 돌려준다. */
     public List<Place> search(String query, int limit) {
         // LIKE 패턴의 특수문자(% _)와 이스케이프 문자(!)는 일반 문자로 취급한다
         String pattern = "%" + query.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
         return jdbc.sql("SELECT " + COLUMNS + ", NULL::float8 AS distance_m FROM locations "
-                        + "WHERE full_name ILIKE :pattern ESCAPE '!' ORDER BY length(full_name), id LIMIT :limit")
+                        + "WHERE full_name ILIKE :pattern ESCAPE '!' ORDER BY (sigungu IS NOT NULL)::int + (eupmyeondong IS NOT NULL)::int, length(full_name), id LIMIT :limit")
                 .param("pattern", pattern).param("limit", limit)
                 .query(MAPPER).list();
     }

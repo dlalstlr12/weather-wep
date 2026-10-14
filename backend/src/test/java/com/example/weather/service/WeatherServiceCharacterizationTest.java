@@ -7,9 +7,14 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.example.weather.dto.WeatherDtos;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.example.weather.location.LocationRepository;
+import com.example.weather.location.Place;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -27,7 +32,14 @@ class WeatherServiceCharacterizationTest {
         wm.resetAll();
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
-        service = new WeatherService(KmaFixtures.client(wm.baseUrl()), new LocationResolver(org.mockito.Mockito.mock(com.example.weather.location.LocationRepository.class)));
+        LocationRepository repo = mock(LocationRepository.class);
+        // 위치 테이블에서 이름으로 찾은 결과 (기상청 공식 격자)
+        Place busan = new Place(1, "부산광역시", "부산광역시", null, null, 98, 76, 35.1770, 129.0770, null);
+        Place daegu = new Place(2, "대구광역시", "대구광역시", null, null, 89, 90, 35.8685, 128.6036, null);
+        when(repo.findBestMatch("부산")).thenReturn(Optional.of(busan));
+        when(repo.findBestMatch("부산광역시")).thenReturn(Optional.of(busan));
+        when(repo.findBestMatch("대구")).thenReturn(Optional.of(daegu));
+        service = new WeatherService(KmaFixtures.client(wm.baseUrl()), new LocationResolver(repo));
     }
 
     @Test
@@ -64,13 +76,15 @@ class WeatherServiceCharacterizationTest {
                 .withQueryParam("nx", equalTo("98")).withQueryParam("ny", equalTo("76")));
     }
 
-    /** Phase 1 변경: 부산이 아닌 도시도 자기 좌표로 조회한다 (Phase 0에서는 대구 요청이 서울 좌표 60,127로 조회됐다). */
+    /**
+     * Phase 1 변경: 부산이 아닌 도시도 자기 위치로 조회한다 (Phase 0에서는 대구 요청이 서울 좌표 60,127로 조회됐다).
+     * Phase 3 변경: 좌표에서 계산하지 않고 위치 테이블의 기상청 공식 격자를 쓴다 (대구: 계산값 89,91 대신 공식 89,90).
+     */
     @Test
-    void otherKnownCitiesUseTheirOwnCoordinates() {
+    void cityNameUsesTheOfficialGridFromTheLocationTable() {
         service.getCurrent(null, null, "대구", true);
-        // 대구 35.8714, 128.6014 → 변환 결과 격자 89,91
         wm.verify(getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))
-                .withQueryParam("nx", equalTo("89")).withQueryParam("ny", equalTo("91")));
+                .withQueryParam("nx", equalTo("89")).withQueryParam("ny", equalTo("90")));
     }
 
     /** Phase 1 변경: 지원하지 않는 도시는 서울 날씨를 돌려주는 대신 오류로 알린다. */
@@ -89,7 +103,7 @@ class WeatherServiceCharacterizationTest {
     }
 
     @Test
-    void cityNameContainingKnownCityIsAccepted() {
+    void fullOfficialNameIsAcceptedToo() {
         service.getCurrent(null, null, "부산광역시", true);
         wm.verify(getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))
                 .withQueryParam("nx", equalTo("98")).withQueryParam("ny", equalTo("76")));

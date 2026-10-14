@@ -53,14 +53,12 @@ class LocationResolverTest {
     }
 
     @Test
-    void fallsBackToTheBuiltInCitiesWhenTheTableHasNoMatch() {
-        assertEquals(new LocationResolver.Location(37.5665, 126.9780), resolver.resolve(null, null, " 서울 "));
-        assertEquals(new LocationResolver.Location(35.1796, 129.0756), resolver.resolve(null, null, "Busan"));
-    }
-
-    @Test
     void halfCoordinatesFallBackToCity() {
-        assertEquals(new LocationResolver.Location(37.5665, 126.9780), resolver.resolve(37.0, null, "서울"));
+        when(repo.findBestMatch("서울")).thenReturn(Optional.of(
+                new Place(1, "서울특별시", "서울특별시", null, null, 60, 127, 37.5636, 126.9800, null)));
+        LocationResolver.Location loc = resolver.resolve(37.0, null, "서울");
+        assertEquals(60, loc.nx());
+        assertEquals("서울특별시", loc.name());
     }
 
     @Test
