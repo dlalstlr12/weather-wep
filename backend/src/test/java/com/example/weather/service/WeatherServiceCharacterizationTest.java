@@ -27,7 +27,7 @@ class WeatherServiceCharacterizationTest {
         wm.resetAll();
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
         wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
-        service = new WeatherService(KmaFixtures.client(wm.baseUrl()));
+        service = new WeatherService(KmaFixtures.client(wm.baseUrl()), new LocationResolver());
     }
 
     @Test
@@ -38,15 +38,13 @@ class WeatherServiceCharacterizationTest {
         assertEquals("맑음", r.sky());
     }
 
-    /**
-     * 알려진 결함의 현재 동작 고정: 실제 초단기실황(data.go.kr) 응답에는 SKY 카테고리가 없는데,
-     * skyCodeToText(null)이 switch에서 NullPointerException을 일으켜 provider=data에서는 현재 날씨 조회가 실패한다.
-     * (배포 설정은 provider=hub라 단기예보 응답을 써서 드러나지 않았다.)
-     */
+    /** Phase 1 변경: 실황 응답에 SKY가 없어도 NPE 없이 하늘 상태를 "-"로 처리한다 (Phase 0에서는 NullPointerException). */
     @Test
-    void currentWithoutSkyCategoryThrowsNullPointer() {
+    void currentWithoutSkyCategoryFallsBackToDash() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_OK)));
-        assertThrows(NullPointerException.class, () -> service.getCurrent(37.5665, 126.9780, null, true));
+        WeatherDtos.CurrentWeatherResponse r = service.getCurrent(37.5665, 126.9780, null, true);
+        assertEquals("-", r.sky());
+        assertEquals(18.5, r.temperature());
     }
 
     @Test
@@ -66,15 +64,35 @@ class WeatherServiceCharacterizationTest {
                 .withQueryParam("nx", equalTo("98")).withQueryParam("ny", equalTo("76")));
     }
 
-    /**
-     * 알려진 결함의 현재 동작 고정: city가 비어 있지 않으면 부산이 아닌 모든 도시가 서울 좌표(60,127)로 조회된다.
-     * (예: 대구, 제주 → 서울 날씨) 이후 단계에서 위치 해석을 고치면 이 테스트를 갱신한다.
-     */
+    /** Phase 1 변경: 부산이 아닌 도시도 자기 좌표로 조회한다 (Phase 0에서는 대구 요청이 서울 좌표 60,127로 조회됐다). */
     @Test
-    void anyOtherCityNameIsTreatedAsSeoul() {
-        service.getCurrent(35.8714, 128.6014, "대구", true);
+    void otherKnownCitiesUseTheirOwnCoordinates() {
+        service.getCurrent(null, null, "대구", true);
+        // 대구 35.8714, 128.6014 → 변환 결과 격자 89,91
         wm.verify(getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))
-                .withQueryParam("nx", equalTo("60")).withQueryParam("ny", equalTo("127")));
+                .withQueryParam("nx", equalTo("89")).withQueryParam("ny", equalTo("91")));
+    }
+
+    /** Phase 1 변경: 지원하지 않는 도시는 서울 날씨를 돌려주는 대신 오류로 알린다. */
+    @Test
+    void unknownCityIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> service.getCurrent(null, null, "제주", true));
+        wm.verify(0, getRequestedFor(urlPathEqualTo("/getUltraSrtNcst")));
+    }
+
+    /** Phase 1 변경: 좌표와 도시명이 함께 오면 좌표가 우선한다 (Phase 0에서는 도시명이 좌표를 덮어썼다). */
+    @Test
+    void explicitCoordinatesWinOverCityName() {
+        service.getCurrent(35.1796, 129.0756, "서울", true);
+        wm.verify(getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))
+                .withQueryParam("nx", equalTo("98")).withQueryParam("ny", equalTo("76")));
+    }
+
+    @Test
+    void cityNameContainingKnownCityIsAccepted() {
+        service.getCurrent(null, null, "부산광역시", true);
+        wm.verify(getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))
+                .withQueryParam("nx", equalTo("98")).withQueryParam("ny", equalTo("76")));
     }
 
     @Test

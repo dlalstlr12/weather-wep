@@ -17,7 +17,7 @@ export async function api(path: string, options: RequestInit = {}) {
     data = text
   }
   if (!res.ok) {
-    throw new Error(typeof data === 'string' ? data : data?.message || 'Request failed')
+    throw new Error(typeof data === 'string' ? data : data?.detail || data?.message || 'Request failed')
   }
   return data
 }

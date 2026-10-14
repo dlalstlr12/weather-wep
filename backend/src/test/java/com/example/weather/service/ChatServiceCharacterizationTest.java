@@ -72,6 +72,26 @@ class ChatServiceCharacterizationTest {
         verify(hf).generate(org.mockito.ArgumentMatchers.contains("데이터 오류"));
     }
 
+    /** Phase 1 변경: 날씨 조회 실패 시 LLM 프롬프트를 만들면서 같은 조회를 한 번 더 하지 않는다 (Phase 0에서는 2회 호출). */
+    @Test
+    void weatherLookupHappensOnlyOnceEvenWhenItFails() {
+        when(weather.getCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                anyString(), org.mockito.ArgumentMatchers.anyBoolean())).thenThrow(new RuntimeException("KMA down"));
+        when(hf.generate(anyString())).thenReturn("확인할 수 없어요");
+        chat.chat(ask("서울 지금 날씨"));
+        verify(weather, org.mockito.Mockito.times(1)).getCurrent(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), anyString(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    void currentAndForecastKeywordsTogetherPreferCurrent() {
+        when(weather.getCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("서울"), org.mockito.ArgumentMatchers.eq(false)))
+                .thenReturn(new WeatherDtos.CurrentWeatherResponse(10.0, 0.0, "맑음"));
+        assertTrue(chat.chat(ask("서울 오늘 예보")).content().contains("10.0°C"));
+        verifyNoInteractions(hf);
+    }
+
     @Test
     void nonWeatherQuestionGoesToLlm() {
         when(hf.generate(anyString())).thenReturn("안녕하세요");
