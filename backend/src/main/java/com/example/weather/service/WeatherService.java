@@ -4,8 +4,6 @@ import com.example.weather.dto.WeatherDtos;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -13,64 +11,34 @@ import java.util.Map;
 public class WeatherService {
 
     private final KmaClient kmaClient;
+    private final LocationResolver locationResolver;
 
     public WeatherDtos.CurrentWeatherResponse getCurrent(Double lat, Double lon, String city, boolean nocache) {
-        // 간단 프리셋(임시): 도시명이 오면 좌표 대체
-        if (city != null && !city.isBlank()) {
-            String c = city.toLowerCase(Locale.ROOT);
-            if (c.contains("busan") || city.contains("부산")) {
-                lat = 35.1796; lon = 129.0756;
-            } else { // default: 서울
-                lat = 37.5665; lon = 126.9780;
-            }
-        }
-
-        if (lat == null || lon == null) {
-            // 좌표가 없다면 의미있는 응답 불가
-            throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
-        }
-
-        Map<String, String> now = kmaClient.getUltraNowcast(lat, lon, nocache);
+        LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
+        Map<String, String> now = kmaClient.getUltraNowcast(loc.lat(), loc.lon(), nocache);
 
         // 실황: T1H/RN1, 예보: TMP/PCP
         String t = firstNonNull(now.get("T1H"), now.get("TMP"));
         String p = firstNonNull(now.get("RN1"), now.get("PCP"));
-        Double temperature = parseDoubleSafe(t);
-        Double precipitation = normalizePrecipitation(p);
-        String sky = KmaClient.skyCodeToText(now.get("SKY"));
-
-        return new WeatherDtos.CurrentWeatherResponse(temperature, precipitation, sky);
+        return new WeatherDtos.CurrentWeatherResponse(
+                parseDoubleSafe(t), normalizePrecipitation(p), KmaClient.skyCodeToText(now.get("SKY")));
     }
 
     public WeatherDtos.ForecastResponse getForecast(Double lat, Double lon, String city, boolean nocache) {
-        if (city != null && !city.isBlank()) {
-            String c = city.toLowerCase(Locale.ROOT);
-            if (c.contains("busan") || city.contains("부산")) {
-                lat = 35.1796; lon = 129.0756;
-            } else {
-                lat = 37.5665; lon = 126.9780;
-            }
-        }
-        if (lat == null || lon == null) {
-            throw new IllegalArgumentException("위치 정보(lat, lon)가 필요합니다.");
-        }
-        var list = kmaClient.getVilageForecast(lat, lon, nocache);
+        LocationResolver.Location loc = locationResolver.resolve(lat, lon, city);
+        var list = kmaClient.getVilageForecast(loc.lat(), loc.lon(), nocache);
         java.util.List<WeatherDtos.ForecastEntry> items = new java.util.ArrayList<>();
         for (var m : list) {
-            String dt = m.get("dateTime");
             String t = firstNonNull(m.get("TMP"), m.get("T1H"));
             String p = firstNonNull(m.get("PCP"), m.get("RN1"));
-            String skyCode = m.get("SKY");
-            String popStr = m.get("POP");
-            String rehStr = m.get("REH");
-            String wsdStr = m.get("WSD");
-            Double temperature = parseDoubleSafe(t);
-            Double precipitation = normalizePrecipitation(p);
-            String sky = KmaClient.skyCodeToText(skyCode);
-            Integer pop = parseIntSafe(popStr);
-            Integer reh = parseIntSafe(rehStr);
-            Double wsd = parseDoubleSafe(wsdStr);
-            items.add(new WeatherDtos.ForecastEntry(dt, temperature, precipitation, sky, pop, reh, wsd));
+            items.add(new WeatherDtos.ForecastEntry(
+                    m.get("dateTime"),
+                    parseDoubleSafe(t),
+                    normalizePrecipitation(p),
+                    KmaClient.skyCodeToText(m.get("SKY")),
+                    parseIntSafe(m.get("POP")),
+                    parseIntSafe(m.get("REH")),
+                    parseDoubleSafe(m.get("WSD"))));
         }
         return new WeatherDtos.ForecastResponse(items);
     }
