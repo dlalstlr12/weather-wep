@@ -8,6 +8,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -75,27 +76,63 @@ class KmaClientCharacterizationTest {
         wm.verify(2, getRequestedFor(urlPathEqualTo("/getUltraSrtNcst")));
     }
 
+    /** Phase 1 변경: resultCode 오류가 파싱 실패로 감싸지지 않고 코드가 그대로 전달된다 (Phase 0에서는 "KMA 응답 파싱 실패"로 바뀌어 코드가 사라졌다). */
     @Test
-    void resultCodeErrorIsWrappedAsParseFailure() {
+    void resultCodeErrorKeepsTheCode() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.RESULT_CODE_ERROR)));
-        RuntimeException e = assertThrows(RuntimeException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
-        // 현재 동작: "KMA 오류"가 try 안에서 던져진 뒤 catch에서 "파싱 실패"로 다시 감싸진다 (오류 코드가 메시지에서 사라짐)
-        assertEquals("KMA 응답 파싱 실패", e.getMessage());
-        assertTrue(e.getCause().getMessage().contains("code=22"));
+        KmaApiException e = assertThrows(KmaApiException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        assertEquals(KmaApiException.Kind.RESULT_CODE, e.kind());
+        assertEquals("22", e.resultCode());
+        assertTrue(e.getMessage().contains("code=22"));
     }
 
     @Test
-    void http500IsThrownAsRuntimeException() {
+    void http500IsThrownAsHttpErrorWithoutLeakingTheServiceKey() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(aResponse().withStatus(500)));
-        RuntimeException e = assertThrows(RuntimeException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        KmaApiException e = assertThrows(KmaApiException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        assertEquals(KmaApiException.Kind.HTTP_ERROR, e.kind());
         assertTrue(e.getMessage().contains("HTTP 500"));
+        // Phase 0에서는 메시지에 서비스키가 들어 있는 전체 URL이 포함됐다
+        assertFalse(e.getMessage().contains("test-key"));
         wm.verify(1, getRequestedFor(urlPathEqualTo("/getUltraSrtNcst"))); // 재시도 없음
     }
 
     @Test
-    void malformedJsonThrows() {
+    void malformedJsonIsParseError() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson("this is not json")));
-        assertThrows(RuntimeException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        KmaApiException e = assertThrows(KmaApiException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        assertEquals(KmaApiException.Kind.PARSE_ERROR, e.kind());
+    }
+
+    @Test
+    void unexpectedJsonStructureIsParseError() {
+        wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson("{\"foo\":1}")));
+        KmaApiException e = assertThrows(KmaApiException.class, () -> client().getUltraNowcast(37.5665, 126.9780, true));
+        assertEquals(KmaApiException.Kind.PARSE_ERROR, e.kind());
+    }
+
+    @Test
+    void connectionRefusedIsUnreachable() {
+        KmaClient c = KmaFixtures.client("http://localhost:1"); // 아무도 듣지 않는 포트
+        KmaApiException e = assertThrows(KmaApiException.class, () -> c.getUltraNowcast(37.5665, 126.9780, true));
+        assertEquals(KmaApiException.Kind.UNREACHABLE, e.kind());
+    }
+
+    @Test
+    void hubProviderSendsKeyInHeaderAndUsesVilageEndpointForNowcast() {
+        wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.ULTRA_WITH_SKY)));
+        KmaClient hub = new KmaClient("hub-key", "hub", "http://unused", wm.baseUrl(), "header", "x-api-key", "serviceKey");
+        Map<String, String> r = hub.getUltraNowcast(37.5665, 126.9780, true);
+        assertEquals("18.5", r.get("T1H"));
+        wm.verify(getRequestedFor(urlPathEqualTo("/getVilageFcst")).withHeader("x-api-key", equalTo("hub-key")));
+    }
+
+    @Test
+    void hubProviderCanSendKeyAsQueryParam() {
+        wm.stubFor(get(urlPathEqualTo("/getVilageFcst")).willReturn(okJson(KmaFixtures.VILAGE_OK)));
+        KmaClient hub = new KmaClient("hub-key", "hub", "http://unused", wm.baseUrl(), "query", "x-api-key", "authKey");
+        hub.getVilageForecast(37.5665, 126.9780, true);
+        wm.verify(getRequestedFor(urlPathEqualTo("/getVilageFcst")).withQueryParam("authKey", equalTo("hub-key")));
     }
 
     @Test
@@ -111,7 +148,7 @@ class KmaClientCharacterizationTest {
 
     @Test
     void blankServiceKeyFailsFast() {
-        KmaClient c = new KmaClient("", "data", wm.baseUrl(), "http://unused", "/x", "header", "x-api-key", "serviceKey");
+        KmaClient c = new KmaClient("", "data", wm.baseUrl(), "http://unused", "header", "x-api-key", "serviceKey");
         assertThrows(IllegalStateException.class, () -> c.getUltraNowcast(37.5665, 126.9780, true));
     }
 }

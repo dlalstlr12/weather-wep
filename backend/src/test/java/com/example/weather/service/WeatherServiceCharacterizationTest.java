@@ -38,15 +38,13 @@ class WeatherServiceCharacterizationTest {
         assertEquals("맑음", r.sky());
     }
 
-    /**
-     * 알려진 결함의 현재 동작 고정: 실제 초단기실황(data.go.kr) 응답에는 SKY 카테고리가 없는데,
-     * skyCodeToText(null)이 switch에서 NullPointerException을 일으켜 provider=data에서는 현재 날씨 조회가 실패한다.
-     * (배포 설정은 provider=hub라 단기예보 응답을 써서 드러나지 않았다.)
-     */
+    /** Phase 1 변경: 실황 응답에 SKY가 없어도 NPE 없이 하늘 상태를 "-"로 처리한다 (Phase 0에서는 NullPointerException). */
     @Test
-    void currentWithoutSkyCategoryThrowsNullPointer() {
+    void currentWithoutSkyCategoryFallsBackToDash() {
         wm.stubFor(get(urlPathEqualTo("/getUltraSrtNcst")).willReturn(okJson(KmaFixtures.ULTRA_OK)));
-        assertThrows(NullPointerException.class, () -> service.getCurrent(37.5665, 126.9780, null, true));
+        WeatherDtos.CurrentWeatherResponse r = service.getCurrent(37.5665, 126.9780, null, true);
+        assertEquals("-", r.sky());
+        assertEquals(18.5, r.temperature());
     }
 
     @Test

@@ -39,6 +39,6 @@ final class KmaFixtures {
             """;
 
     static KmaClient client(String baseUrl) {
-        return new KmaClient("test-key", "data", baseUrl, "http://unused", "/x", "header", "x-api-key", "serviceKey");
+        return new KmaClient("test-key", "data", baseUrl, "http://unused", "header", "x-api-key", "serviceKey");
     }
 }
