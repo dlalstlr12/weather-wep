@@ -30,4 +30,4 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W)/perf:/perf" -e VUS=60 -e DURATI
 측정 환경과 해석은 `docs/baseline.md` 참고.
 
 ## PostGIS 인덱스 벤치마크
-`python perf/postgis/run_benchmark.py <행 수>` (PostGIS 컨테이너 `weather-bench` 필요, 스크립트 상단 설명 참고). 결과는 `perf/postgis/results-*.txt`.
+`python perf/postgis/run_benchmark.py <행 수>` (합성 점), `python perf/postgis/run_real_benchmark.py` (실제 행정구역 데이터). PostGIS 컨테이너 `weather-bench` 필요, 스크립트 상단 설명 참고. 결과는 `perf/postgis/results-*.txt`. 쿼리마다 세션을 새로 열면 세션 초기화 비용이 섞이므로 같은 세션에서 반복해 측정한다.

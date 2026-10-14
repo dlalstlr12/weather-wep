@@ -1,9 +1,8 @@
 행 수: 100,000
-  반경 5km 검색 (ST_DWithin): median 213.05 ms, min 206.25 ms, 계획 Seq Scan
-  가장 가까운 5개 (KNN, <->): median 61.49 ms, min 58.72 ms, 계획 Seq Scan
-  반경 5km 검색 (ST_DWithin): median 7.64 ms, min 6.83 ms, 계획 Bitmap Heap Scan
-  가장 가까운 5개 (KNN, <->): median 7.85 ms, min 7.28 ms, 계획 Index Scan
+  반경 5km 검색 (ST_DWithin): median 140.79 ms, min 129.32 ms, 계획 Seq Scan
+  가장 가까운 5개 (KNN, <->): median 54.65 ms, min 49.50 ms, 계획 Seq Scan
+  반경 5km 검색 (ST_DWithin): median 0.16 ms, min 0.11 ms, 계획 Bitmap Heap Scan / Bitmap Index Scan
+  가장 가까운 5개 (KNN, <->): median 0.31 ms, min 0.23 ms, 계획 Index Scan
 == 요약 (median ms)
-== 요약 (median ms)
-  반경 5km 검색 (ST_DWithin): 213.05 -> 7.64 ms (28배), Seq Scan -> Bitmap Heap Scan
-  가장 가까운 5개 (KNN, <->): 61.49 -> 7.85 ms (8배), Seq Scan -> Index Scan
+  반경 5km 검색 (ST_DWithin): 140.79 -> 0.16 ms (880배), Seq Scan -> Bitmap Heap Scan / Bitmap Index Scan
+  가장 가까운 5개 (KNN, <->): 54.65 -> 0.31 ms (175배), Seq Scan -> Index Scan

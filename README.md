@@ -190,3 +190,9 @@ Base URL: `${VITE_API_BASE_URL}` (프론트) / `https://weather-wep.onrender.com
 
 # 라이선스
 본 저장소는 포트폴리오 목적의 예시 프로젝트로, 별도의 라이선스 명시가 없는 한 개인 학습 및 시연 용도로 사용 가능합니다.
+
+---
+
+# 데이터 출처
+- 행정구역별 기상청 격자 좌표: 기상청 단기예보 조회서비스 오픈API 활용가이드의 '격자 위경도' (공공데이터포털, [공공누리 제1유형](https://www.data.go.kr/data/15084084/openapi.do) 출처표시). 적재 방법과 데이터 설명은 `docs/phase3-postgis.md` 참고
+

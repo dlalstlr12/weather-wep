@@ -35,22 +35,21 @@ def psql(sql):
     return out.stdout.decode("utf-8", "replace")
 
 
-def explain(query):
-    text = psql("EXPLAIN (ANALYZE, BUFFERS) " + query)
-    ms = float(re.search(r"Execution Time: ([\d.]+) ms", text).group(1))
-    node = re.findall(r"(Seq Scan|Index Scan|Bitmap Heap Scan|Bitmap Index Scan)", text)
-    return ms, " / ".join(dict.fromkeys(node)), text
+def explain_runs(query):
+    """같은 psql 세션에서 RUNS+1번 실행한다. 새 세션의 첫 호출에는 PROJ·SRID 캐시 초기화(약 8ms)가 섞이므로
+    첫 번째 결과는 버리고, 연결을 재사용하는 서버(커넥션 풀)의 상태를 측정한다."""
+    text = psql(";\n".join(["EXPLAIN (ANALYZE, BUFFERS) " + query] * (RUNS + 1)) + ";")
+    times = [float(m) for m in re.findall(r"Execution Time: ([\d.]+) ms", text)][1:]
+    plan = text.split("Planning")[0]
+    node = re.findall(r"(Seq Scan|Index Scan|Bitmap Heap Scan|Bitmap Index Scan)", plan)
+    return times, " / ".join(dict.fromkeys(node)), plan
 
 
 def measure(label):
     print(f"\n== {label}")
     out = {}
     for name, q in QUERIES.items():
-        explain(q)
-        times = []
-        for _ in range(RUNS):
-            ms, node, text = explain(q)
-            times.append(ms)
+        times, node, text = explain_runs(q)
         out[name] = (statistics.median(times), node, text)
         print(f"  {name}: median {statistics.median(times):.3f} ms, 계획 {node}")
     return out
