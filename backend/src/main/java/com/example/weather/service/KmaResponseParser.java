@@ -44,15 +44,19 @@ final class KmaResponseParser {
             Map<?, ?> header = (Map<?, ?>) response.get("header");
             Object resultCode = header.get("resultCode");
             if (resultCode != null && !"00".equals(resultCode.toString())) {
-                throw new KmaApiException(KmaApiException.Kind.RESULT_CODE,
+                // 03: 해당 기준 시각의 자료 없음. 이 값은 공식 문서에서 확인하지 못했고 NODATA로 알려진 값을 쓴다.
+                KmaApiException.Kind kind = "03".equals(resultCode.toString())
+                        ? KmaApiException.Kind.NO_DATA : KmaApiException.Kind.RESULT_CODE;
+                throw new KmaApiException(kind,
                         "KMA 오류: code=" + resultCode + ", msg=" + header.get("resultMsg"), resultCode.toString(), null);
             }
             Map<?, ?> items = (Map<?, ?>) ((Map<?, ?>) response.get("body")).get("items");
             List<?> list = (List<?>) items.get("item");
-            List<Map<?, ?>> out = new ArrayList<>();
-            if (list != null) {
-                for (Object o : list) out.add((Map<?, ?>) o);
+            if (list == null || list.isEmpty()) {
+                throw new KmaApiException(KmaApiException.Kind.NO_DATA, "KMA 응답에 자료가 없습니다", null, null);
             }
+            List<Map<?, ?>> out = new ArrayList<>();
+            for (Object o : list) out.add((Map<?, ?>) o);
             return out;
         } catch (KmaApiException e) {
             throw e;

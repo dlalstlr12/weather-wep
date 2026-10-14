@@ -41,4 +41,18 @@ class KmaBaseTimeTest {
     void ultraJustAfterMidnightRollsBackToPreviousDay() {
         assertEquals(new KmaBaseTime.Base("20261013", "2330"), at("2026-10-14T00:10:00").ultra());
     }
+
+    @Test
+    void previousVilageSlot() {
+        assertEquals(new KmaBaseTime.Base("20261014", "1100"), KmaBaseTime.previousVilage(new KmaBaseTime.Base("20261014", "1400")));
+        assertEquals(new KmaBaseTime.Base("20261014", "0200"), KmaBaseTime.previousVilage(new KmaBaseTime.Base("20261014", "0500")));
+        assertEquals(new KmaBaseTime.Base("20261013", "2300"), KmaBaseTime.previousVilage(new KmaBaseTime.Base("20261014", "0200")));
+        assertEquals(new KmaBaseTime.Base("20261013", "2000"), KmaBaseTime.previousVilage(new KmaBaseTime.Base("20261013", "2300")));
+    }
+
+    @Test
+    void previousUltraSlot() {
+        assertEquals(new KmaBaseTime.Base("20261014", "1230"), KmaBaseTime.previousUltra(new KmaBaseTime.Base("20261014", "1330")));
+        assertEquals(new KmaBaseTime.Base("20261013", "2330"), KmaBaseTime.previousUltra(new KmaBaseTime.Base("20261014", "0030")));
+    }
 }
