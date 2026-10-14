@@ -49,3 +49,6 @@ tmp/
 .temp/
 **/tmp/
 **/.cache/
+
+# 예시 파일은 커밋 대상
+!.env.example
