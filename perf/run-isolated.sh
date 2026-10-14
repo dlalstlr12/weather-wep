@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 시나리오마다 백엔드를 새로 띄워 서킷 브레이커·캐시 상태가 섞이지 않게 측정한다 (Windows git-bash 기준).
-# 전제: WireMock(8089)과 MySQL이 떠 있고, SPRING_DATASOURCE_*, JWT_SECRET, KMA_SERVICE_KEY 환경변수가 export 되어 있다.
+# 전제: WireMock(8089)과 DB(PostgreSQL)가 떠 있고, SPRING_DATASOURCE_*, JWT_SECRET, KMA_SERVICE_KEY 환경변수가 export 되어 있다.
 # 사용법: bash perf/run-isolated.sh <label> [백엔드에 넘길 추가 인자...]
 set -u
 LABEL="${1:?label}"; shift

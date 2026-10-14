@@ -1,6 +1,6 @@
 # Weather WEP
 
-직관적인 날씨 조회와 지도 탐색, 간단한 날씨 대화(챗)를 제공하는 풀스택 프로젝트입니다. 프론트는 Cloudflare Pages, 백엔드는 Render, 데이터베이스는 Railway(MySQL)로 배포되었습니다. 포트폴리오 목적의 실전형 CI/CD 및 멀티 플랫폼 배포 구성을 포함합니다.
+직관적인 날씨 조회와 지도 탐색, 간단한 날씨 대화(챗)를 제공하는 풀스택 프로젝트입니다. 프론트는 Cloudflare Pages, 백엔드는 Render, 데이터베이스는 Railway(PostgreSQL + PostGIS)로 배포됩니다. 포트폴리오 목적의 실전형 CI/CD 및 멀티 플랫폼 배포 구성을 포함합니다.
 
 ## 프로젝트 노션 링크
 - https://aback-may-a76.notion.site/
@@ -12,7 +12,7 @@
 ## 한눈에 보기
 - 프론트엔드: React + Vite + TypeScript
 - 백엔드: Spring Boot 3 (Java 17), Spring Security + JWT, JPA(Hibernate), Flyway
-- 데이터베이스: MySQL (Railway)
+- 데이터베이스: PostgreSQL 16 + PostGIS 3.4 (Railway)
 - 인프라/배포: Cloudflare Pages(프론트), Render(백), Railway(DB)
 - 기타: Docker/Docker Compose, Jenkins(선택적), Kakao 지도 SDK, KMA(기상청) API 연동 설계
 
@@ -26,7 +26,7 @@
 
 # 아키텍처
 ```
-Cloudflare Pages(React)  ──(HTTPS, CORS)──>  Render(Spring Boot API)  ──>  Railway(MySQL)
+Cloudflare Pages(React)  ──(HTTPS, CORS)──>  Render(Spring Boot API)  ──>  Railway(PostgreSQL + PostGIS)
                                      └── 외부 API(KMA 등)
 ```
 - 프론트는 `VITE_API_BASE_URL`을 통해 백엔드 절대 URL로 요청
@@ -57,7 +57,7 @@ root
      - `VITE_API_BASE_URL=http://localhost:8080`
      - `VITE_KAKAO_MAPS_KEY=카카오_Javascript_키`
    - 백엔드(application.yml 또는 env):
-     - `SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/weather_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8`
+     - `SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/weather_db` (docker compose에서는 자동 설정, 로컬 단독 실행은 `jdbc:postgresql://localhost:5432/weather_db`)
      - `SPRING_DATASOURCE_USERNAME=...`
      - `SPRING_DATASOURCE_PASSWORD=...`
      - `JWT_SECRET=임의의_랜덤_시크릿`
@@ -68,7 +68,7 @@ root
 ## 2) 배포 환경
 - 프론트: Cloudflare Pages (환경변수 `VITE_API_BASE_URL`, `VITE_KAKAO_MAPS_KEY` 설정 후 빌드)
 - 백엔드: Render (CORS 허용 오리진에 Pages 도메인 추가, Flyway 마이그레이션 자동 실행)
-- DB: Railway(MySQL)
+- DB: Railway(PostgreSQL + PostGIS). Railway의 PostGIS 템플릿(PostgreSQL 16, PostGIS 3.4)으로 DB를 만들고, 접속 정보를 `jdbc:postgresql://HOST:PORT/DB` 형식의 `SPRING_DATASOURCE_URL`과 `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`로 Render에 설정합니다. `postgis` 확장은 Flyway(V3)가 만듭니다
 
 ---
 
@@ -164,7 +164,7 @@ Base URL: `${VITE_API_BASE_URL}` (프론트) / `https://weather-wep.onrender.com
 - 현재 구성
   - 프론트: Cloudflare Pages Git 연동 자동 빌드/배포
   - 백엔드: Render Git 연동 자동 배포(또는 Deploy Hook)
-  - DB: Railway MySQL (마이그레이션은 백엔드 기동 시 Flyway 수행)
+  - DB: Railway PostgreSQL + PostGIS (마이그레이션은 백엔드 기동 시 Flyway 수행)
 - 선택(확장): Jenkins 파이프라인에서 테스트→빌드→배포(각 플랫폼 API/CLI 호출) 중앙 관리 가능
 
 ---
@@ -182,7 +182,7 @@ Base URL: `${VITE_API_BASE_URL}` (프론트) / `https://weather-wep.onrender.com
 3. 인증(JWT) 및 보호 라우트 적용, 로그인 상태 즉시 반영 로직 구현
 4. Kakao 지도 연동: 위치/검색/마커, 즐겨찾기 표시
 5. Docker/Docker Compose로 로컬 통합, Flyway 도입
-6. 배포: Cloudflare Pages(프론트), Render(백엔드), Railway(MySQL)
+6. 배포: Cloudflare Pages(프론트), Render(백엔드), Railway(PostgreSQL + PostGIS)
 7. CORS/프리플라이트, Kakao 도메인 허용 문제 해결
 8. 최종 폴리싱 및 문서화(README/명세)
 
