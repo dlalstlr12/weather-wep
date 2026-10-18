@@ -33,6 +33,7 @@ export default function ChatPage() {
   }, [msgs])
 
   const [, setTyping] = useState(false)
+  const [status, setStatus] = useState('')
   const [ctrl, setCtrl] = useState<AbortController | null>(null)
 
   const send = async () => {
@@ -53,53 +54,76 @@ export default function ChatPage() {
     }
   }
 
+  // 서버가 보내는 SSE 이벤트: status(도구 조회 중), delta(답변 조각), reset(지금까지의 조각 삭제), done, error
   const requestAssistantStream = async (history: Msg[]): Promise<void> => {
     const assistantId = crypto.randomUUID()
-    // 미리 assistant 메시지 placeholder 추가
+    // 미리 assistant 메시지 placeholder 추가 (내용이 생기기 전에는 화면에 그리지 않는다)
     setMsgs((m) => [...m, { id: assistantId, role: 'assistant', content: '', at: Date.now() }])
+    const setContent = (fn: (prev: string) => string) =>
+      setMsgs((m) => m.map(msg => msg.id === assistantId ? { ...msg, content: fn(msg.content) } : msg))
 
     const messages = history.map(h => ({ role: h.role, content: h.content }))
     const controller = new AbortController()
     setCtrl(controller)
-    const res = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('accessToken') ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` } : {})
-      },
-      body: JSON.stringify({ messages, lat: coords?.lat ?? null, lon: coords?.lon ?? null }),
-      signal: controller.signal
-    })
-    if (!res.ok || !res.body) throw new Error('스트리밍 시작 실패')
+    try {
+      const res = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('accessToken') ? { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` } : {})
+        },
+        body: JSON.stringify({ messages, lat: coords?.lat ?? null, lon: coords?.lon ?? null }),
+        signal: controller.signal
+      })
+      if (!res.ok || !res.body) throw new Error('스트리밍 시작 실패')
 
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buffer = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      // SSE 프레임 분리 (\n\n 기준)
-      const parts = buffer.split(/\n\n/)
-      buffer = parts.pop() || ''
-      for (const chunk of parts) {
-        // data: 내용 라인만 추출
-        const lines = chunk.split(/\n/)
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue
-          const data = line.slice(5).trim()
-          if (data === '[DONE]') {
-            return
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+      let finished = false
+      let gotText = false
+      while (!finished) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        // SSE 프레임은 빈 줄로 구분된다
+        const frames = buffer.split(/\r?\n\r?\n/)
+        buffer = frames.pop() || ''
+        for (const frame of frames) {
+          let event = 'message'
+          const dataLines: string[] = []
+          for (const line of frame.split(/\r?\n/)) {
+            if (line.startsWith('event:')) event = line.slice(6).trim()
+            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
           }
-          if (data.startsWith('[ERROR]')) {
-            throw new Error(data)
+          const data = dataLines.length ? JSON.parse(dataLines.join('\n')) : {}
+          if (event === 'status') {
+            setStatus(data.text || '')
+          } else if (event === 'delta') {
+            gotText = true
+            setStatus('')
+            setContent((prev) => prev + (data.text || ''))
+          } else if (event === 'reset') {
+            gotText = false
+            setContent(() => '')
+          } else if (event === 'error') {
+            throw new Error(data.message || '응답 중 오류가 발생했어요.')
+          } else if (event === 'done') {
+            finished = true
           }
-          // 누적 반영
-          setMsgs((m) => m.map(msg => msg.id === assistantId ? { ...msg, content: msg.content + data } : msg))
         }
       }
+      if (!gotText) throw new Error('응답이 비어 있어요.')
+    } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        setContent((prev) => prev || '(응답을 취소했어요)')
+        return
+      }
+      setContent(() => '죄송해요, 응답 중 오류가 발생했어요.')
+    } finally {
+      setStatus('')
+      setCtrl(null)
     }
-    setCtrl(null)
   }
 
   useEffect(() => {
@@ -117,7 +141,7 @@ export default function ChatPage() {
       </div>
       <h2>날씨 챗</h2>
       <div ref={wrapRef} className="card" style={{ height: 420, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {msgs.map(m => (
+        {msgs.filter(m => m.role === 'user' || m.content).map(m => (
           <div key={m.id} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             <div style={{ maxWidth: '78%', padding: '10px 12px', borderRadius: 14, whiteSpace: 'pre-wrap', lineHeight: 1.4,
               background: m.role === 'user' ? '#6366f1' : 'rgba(255,255,255,0.75)', color: m.role === 'user' ? '#fff' : '#0f172a' }}>
@@ -129,7 +153,7 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
-        {loading && <div className="muted">응답 생성 중...</div>}
+        {loading && <div className="muted">{status || '응답 생성 중...'}</div>}
       </div>
       <form onSubmit={(e) => { e.preventDefault(); send() }} className="search" style={{ marginTop: 12, display: 'flex', gap: 8 }}>
         <input style={{ flex: 1 }} value={input} onChange={(e) => setInput(e.target.value)} placeholder="메시지를 입력하세요" />

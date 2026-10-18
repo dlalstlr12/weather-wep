@@ -4,9 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.weather.dto.WeatherDtos;
@@ -72,6 +74,25 @@ class ApiSecurityIntegrationTest extends PostgisIntegrationTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertTrue(answer.contains("18.5"), answer);
+    }
+
+    @Test
+    void streamEndpointSendsDeltaThenDoneAsServerSentEvents() throws Exception {
+        when(weather.getCurrent(any(), any(), any(), anyBoolean())).thenReturn(new WeatherDtos.CurrentWeatherResponse(18.5, 0.0, "맑음"));
+        String token = signupAndLogin();
+
+        var started = mvc.perform(post("/api/chat/stream").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(CHAT_BODY))
+                .andExpect(request().asyncStarted()).andReturn();
+        // 비동기로 보낸 이벤트가 끝날 때까지 기다린다 (LLM은 꺼져 있어 규칙 기반 답변 한 조각 + done)
+        started.getAsyncResult(10_000);
+        // 스트림이 끝날 때의 비동기 재디스패치가 보안 예외 없이 끝나야 한다 (예전에는 매번 로그에 예외가 남았다)
+        String body = mvc.perform(asyncDispatch(started)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(body.contains("event:delta"), body);
+        assertTrue(body.contains("18.5"), body);
+        assertTrue(body.indexOf("event:delta") < body.indexOf("event:done"), body);
     }
 
     @Test

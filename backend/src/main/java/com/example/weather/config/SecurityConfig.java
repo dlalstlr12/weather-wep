@@ -1,6 +1,7 @@
 package com.example.weather.config;
 
 import com.example.weather.security.JwtAuthFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,6 +36,9 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // 챗 스트림(SSE)이 끝날 때의 비동기 재디스패치는 이미 인증을 통과한 요청의 이어짐이다.
+                // 여기서 다시 인증을 요구하면 응답이 이미 나간 뒤라 처리할 수 없는 보안 예외가 매번 로그에 남는다
+                .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/error", "/actuator/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
