@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import { errorText, isUnreachable } from '../api/errors'
+import { useServerStatus } from '../components/ServerStatus'
 import { useNavigate, Link } from 'react-router-dom'
 import BrandBar from '../components/BrandBar'
 import { setFlash } from '../flash'
@@ -12,6 +14,7 @@ export default function SignupPage() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const { recheck } = useServerStatus()
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +38,8 @@ export default function SignupPage() {
       setFlash('회원가입이 완료되었습니다. 로그인해 주세요.')
       nav('/login', { replace: true })
     } catch (e) {
-      setError('회원가입에 실패했습니다.')
+      if (isUnreachable(e)) recheck()
+      setError(errorText(e, '회원가입에 실패했어요.'))
     } finally {
       setLoading(false)
     }

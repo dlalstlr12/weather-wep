@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { errorText } from '../api/errors'
 import ForecastList from '../components/ForecastList'
 import WeatherIcon from '../components/WeatherIcon'
 import DailySummary from '../components/DailySummary'
@@ -77,7 +78,7 @@ export default function MainPage() {
         setForecast(fc?.items || [])
         setSelectedDateTime(null)
       } catch (e) {
-        setError('날씨 정보를 불러오지 못했습니다.')
+        setError(errorText(e, '날씨 정보를 불러오지 못했습니다.'))
       } finally {
         setLoading(false)
       }
@@ -113,7 +114,7 @@ export default function MainPage() {
       setSelectedPlace(null)
       setSelectedDateTime(null)
     } catch (e) {
-      setError('도시의 날씨 정보를 불러오지 못했습니다.')
+      setError(errorText(e, '도시의 날씨 정보를 불러오지 못했습니다.'))
     } finally {
       setLoading(false)
     }
@@ -140,7 +141,7 @@ export default function MainPage() {
       }
       setSelectedDateTime(null)
     } catch (e) {
-      setError('새로고침에 실패했습니다.')
+      setError(errorText(e, '새로고침에 실패했습니다.'))
     } finally { setLoading(false) }
   }
 
@@ -170,7 +171,7 @@ export default function MainPage() {
       setMapCenter(null)
       setSelectedPlace(null)
       setSelectedDateTime(null)
-    } catch (e) { setError('도시의 날씨 정보를 불러오지 못했습니다.') }
+    } catch (e) { setError(errorText(e, '도시의 날씨 정보를 불러오지 못했습니다.')) }
     finally { setLoading(false) }
   }
 
