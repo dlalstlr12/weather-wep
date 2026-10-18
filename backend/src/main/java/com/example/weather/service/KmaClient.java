@@ -1,12 +1,16 @@
 package com.example.weather.service;
 
 import com.example.weather.util.KmaGridConverter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -27,19 +31,29 @@ public class KmaClient {
     private final KmaResilience resilience;
     private final KmaBaseTime baseTime;
     private final KmaCache cache;
+    private final MeterRegistry registry;
 
     @Autowired
+    public KmaClient(KmaProperties props, MeterRegistry registry) {
+        this(props, Clock.system(ZoneId.of("Asia/Seoul")), registry);
+    }
+
     public KmaClient(KmaProperties props) {
-        this(props, Clock.system(ZoneId.of("Asia/Seoul")));
+        this(props, Clock.system(ZoneId.of("Asia/Seoul")), new SimpleMeterRegistry());
     }
 
     KmaClient(KmaProperties props, Clock clock) {
+        this(props, clock, new SimpleMeterRegistry());
+    }
+
+    KmaClient(KmaProperties props, Clock clock, MeterRegistry registry) {
+        this.registry = registry;
         this.serviceKey = props.serviceKey();
         this.provider = props.provider();
         this.api = new KmaApiClient(props);
-        this.resilience = new KmaResilience(props.resilience());
+        this.resilience = new KmaResilience(props.resilience(), registry);
         this.baseTime = new KmaBaseTime(clock);
-        this.cache = new KmaCache(clock, props.cache());
+        this.cache = new KmaCache(clock, props.cache(), registry);
     }
 
     public KmaResult<List<Map<String, String>>> getVilageForecast(double lat, double lon, boolean nocache) {
@@ -76,7 +90,26 @@ public class KmaClient {
      */
     private <T> T call(String endpoint, KmaBaseTime.Base base, KmaGridConverter.Grid grid,
                        Function<Map<?, ?>, T> parser) {
-        return resilience.call(() -> parser.apply(api.get(endpoint, base, grid)));
+        return resilience.call(() -> timedAttempt(endpoint, () -> parser.apply(api.get(endpoint, base, grid))));
+    }
+
+    /** 실제 HTTP 시도 한 번의 소요 시간과 결과(success 또는 실패 종류)를 기록한다. 재시도는 시도마다 따로 기록된다. */
+    private <T> T timedAttempt(String endpoint, Supplier<T> attempt) {
+        Timer.Sample sample = Timer.start(registry);
+        String outcome = "success";
+        try {
+            return attempt.get();
+        } catch (KmaApiException e) {
+            outcome = e.kind().name();
+            throw e;
+        } catch (RuntimeException e) {
+            outcome = "ERROR";
+            throw e;
+        } finally {
+            sample.stop(Timer.builder("kma.upstream.attempt").description("기상청 HTTP 호출 한 번의 소요 시간")
+                    .tag("endpoint", endpoint.substring(1)).tag("outcome", outcome)
+                    .publishPercentileHistogram().register(registry));
+        }
     }
 
     /** 현재 기준 시각의 자료가 아직 없으면(발표 직후 등) 바로 앞 슬롯으로 한 번 더 조회한다. */

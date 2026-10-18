@@ -48,6 +48,24 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
 
+# 관측: 측정값은 별도 관리 포트(기본 8081)에서만 연다. 배포 환경(Render)은 서비스 포트 하나만 공개하므로 밖에서는 보이지 않는다
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: weather-backend
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
 anthropic:
   # 비어 있으면 LLM 없이 규칙 기반 답변만 쓴다. 키는 환경변수로만 넣는다
   api-key: ${ANTHROPIC_API_KEY:}

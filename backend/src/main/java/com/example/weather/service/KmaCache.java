@@ -2,6 +2,10 @@ package com.example.weather.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -30,7 +34,14 @@ final class KmaCache {
     private final long ttlMillis;
     private final long staleMaxMillis;
 
+    private final MeterRegistry registry;
+
     KmaCache(Clock clock, KmaProperties.Cache cfg) {
+        this(clock, cfg, new SimpleMeterRegistry());
+    }
+
+    KmaCache(Clock clock, KmaProperties.Cache cfg, MeterRegistry registry) {
+        this.registry = registry;
         this.clock = clock;
         this.ttlMillis = cfg.ttlSeconds() * 1000;
         this.staleMaxMillis = cfg.staleMaxSeconds() * 1000;
@@ -38,6 +49,18 @@ final class KmaCache {
                 .maximumSize(cfg.maxSize())
                 .expireAfterWrite(Duration.ofMillis(staleMaxMillis))
                 .build();
+        Gauge.builder("kma.cache.size", cache, Cache::estimatedSize).description("캐시에 들어 있는 항목 수").register(registry);
+        // 처음 생긴 카운터는 Prometheus의 increase()가 첫 증가를 세지 못하므로 0으로 미리 등록한다
+        for (String r : new String[] {"hit", "miss", "coalesced", "stale", "failure", "bypass"}) counter(r);
+    }
+
+    /** result: hit(유효한 캐시), miss(새로 불러옴), coalesced(진행 중인 호출을 기다림), stale(실패해서 지난 값으로 대체), failure(실패, 대체할 값 없음), bypass(nocache) */
+    private Counter counter(String result) {
+        return Counter.builder("kma.cache.requests").description("기상청 캐시 조회 결과").tag("result", result).register(registry);
+    }
+
+    private void count(String result) {
+        counter(result).increment();
     }
 
     <T> KmaResult<T> get(String key, boolean nocache, Supplier<T> loader) {
@@ -45,9 +68,11 @@ final class KmaCache {
         long now = clock.millis();
 
         if (nocache) {
+            count("bypass");
             return result(store(key, loader.get()));
         }
         if (cached != null && now - cached.storedAt < ttlMillis) {
+            count("hit");
             return result(cached);
         }
 
@@ -59,12 +84,15 @@ final class KmaCache {
         try {
             Entry fresh = store(key, loader.get());
             mine.complete(fresh);
+            count("miss");
             return result(fresh);
         } catch (RuntimeException e) {
             if (cached != null && now - cached.storedAt < staleMaxMillis) {
                 mine.complete(cached);
+                count("stale");
                 return result(cached);
             }
+            count("failure");
             mine.completeExceptionally(e);
             throw e;
         } finally {
@@ -74,12 +102,19 @@ final class KmaCache {
 
     private <T> KmaResult<T> awaitLeader(CompletableFuture<Entry> leader, Entry cached) {
         try {
-            return result(leader.get(FOLLOWER_WAIT_SECONDS, TimeUnit.SECONDS));
+            KmaResult<T> r = result(leader.get(FOLLOWER_WAIT_SECONDS, TimeUnit.SECONDS));
+            count("coalesced");
+            return r;
         } catch (ExecutionException e) {
+            count("failure");
             if (e.getCause() instanceof RuntimeException re) throw re;
             throw new IllegalStateException(e.getCause());
         } catch (TimeoutException e) {
-            if (cached != null && clock.millis() - cached.storedAt < staleMaxMillis) return result(cached);
+            if (cached != null && clock.millis() - cached.storedAt < staleMaxMillis) {
+                count("stale");
+                return result(cached);
+            }
+            count("failure");
             throw new KmaApiException(KmaApiException.Kind.UNREACHABLE, "기상청 조회 대기 시간 초과", null, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

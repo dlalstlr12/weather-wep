@@ -19,6 +19,8 @@
     <jjwt.version>0.11.5</jjwt.version>
     <!-- 실제 LLM을 호출하는 평가(@Tag("eval"))는 기본 제외. 실행: -Dtest.excludedGroups=none -->
     <test.excludedGroups>eval</test.excludedGroups>
+    <!-- 줄 커버리지 하한선(측정한 값보다 약간 낮게). 이 아래로 떨어지면 mvn verify가 실패한다 -->
+    <jacoco.line.minimum>0.87</jacoco.line.minimum>
   </properties>
 
   <dependencies>
@@ -29,6 +31,14 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -138,6 +148,40 @@
             <SPRING_DATASOURCE_PASSWORD>test</SPRING_DATASOURCE_PASSWORD>
           </environmentVariables>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.12</version>
+        <executions>
+          <execution>
+            <goals><goal>prepare-agent</goal></goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.line.minimum}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

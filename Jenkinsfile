@@ -35,7 +35,7 @@ pipeline {
     stage('Backend Build & Test') {
       steps {
         dir('backend') {
-          bat label: 'Maven Test', script: 'mvn -B -U -DskipTests=false test'
+          bat label: 'Maven Test and Coverage', script: 'mvn -B -U verify'
           bat label: 'Maven Package', script: 'mvn -B -DskipTests package'
         }
       }
