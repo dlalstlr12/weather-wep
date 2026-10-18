@@ -1,5 +1,7 @@
 # Weather WEP
 
+[![CI](https://github.com/dlalstlr12/weather-wep/actions/workflows/ci.yml/badge.svg)](https://github.com/dlalstlr12/weather-wep/actions/workflows/ci.yml)
+
 직관적인 날씨 조회와 지도 탐색, 간단한 날씨 대화(챗)를 제공하는 풀스택 프로젝트입니다. 프론트는 Cloudflare Pages, 백엔드는 Render, 데이터베이스는 Railway(PostgreSQL + PostGIS)로 배포됩니다. 포트폴리오 목적의 실전형 CI/CD 및 멀티 플랫폼 배포 구성을 포함합니다.
 
 ## 프로젝트 노션 링크
@@ -43,7 +45,9 @@ root
 │  ├─ src/main/resources
 │  ├─ pom.xml
 │  └─ Dockerfile
-├─ docker-compose.yml     # 로컬 통합 실행
+├─ docker-compose.yml     # 로컬 통합 실행 (--profile observability로 Prometheus/Grafana 추가)
+├─ observability/         # Prometheus 설정, Grafana 데이터소스·대시보드
+├─ .github/workflows/     # GitHub Actions CI
 ├─ Jenkinsfile            # (선택) Jenkins 파이프라인
 └─ README.md
 ```
@@ -81,13 +85,15 @@ root
 - `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
 - `JWT_SECRET`
 - (옵션) `ANTHROPIC_API_KEY` (챗 LLM, 없으면 규칙 기반 답변), `KMA_SERVICE_KEY`, `PORT`(호스팅 제공자에 의해 주입)
+- (옵션) `MANAGEMENT_PORT` (측정값 관리 포트, 기본 8081)
 
 ---
 
 # 보안 및 CORS
 - Spring Security + JWT
-  - 공개: `/`, `/actuator/**`, `OPTIONS /**`, `GET /api/weather/**`, `/api/auth/**`
+  - 공개: `/`, `OPTIONS /**`, `GET /api/weather/**`, `GET /api/locations/**`, `/api/auth/**`
   - 보호: 그 외 모든 API (특히 `/api/chat/**`)
+- 측정값(`/actuator/prometheus`, `/actuator/health`)은 서비스 포트가 아니라 **별도 관리 포트(기본 8081)** 에서만 열린다. 배포 환경(Render)은 서비스 포트 하나만 공개하므로 밖에서 접근할 수 없다
 - CORS 허용 오리진: `https://weather-wep.pages.dev`, `http://localhost:5173`
 
 ---
@@ -166,7 +172,16 @@ Base URL: `${VITE_API_BASE_URL}` (프론트) / `https://weather-wep.onrender.com
   - 프론트: Cloudflare Pages Git 연동 자동 빌드/배포
   - 백엔드: Render Git 연동 자동 배포(또는 Deploy Hook)
   - DB: Railway PostgreSQL + PostGIS (마이그레이션은 백엔드 기동 시 Flyway 수행)
+- CI: GitHub Actions(`.github/workflows/ci.yml`)가 push와 PR마다 백엔드 `mvn verify`(테스트 + JaCoCo 줄 커버리지 하한선 검사)와 프론트 `npm run build`(타입 검사 포함)를 실행한다
 - 선택(확장): Jenkins 파이프라인에서 테스트→빌드→배포(각 플랫폼 API/CLI 호출) 중앙 관리 가능
+
+## 관측(Observability)
+기상청 호출, 캐시, 서킷 브레이커, 챗(LLM) 경로·토큰·지연을 Micrometer로 측정하고 Prometheus + Grafana로 본다. 자세한 내용은 [docs/phase6-observability.md](docs/phase6-observability.md).
+```bash
+# POSTGRES_PASSWORD, JWT_SECRET 등은 .env 또는 환경변수로 준비
+docker compose --profile observability up -d --build db backend prometheus grafana
+# Grafana: http://localhost:3000 (대시보드 "Weather 백엔드"), Prometheus: http://localhost:9090
+```
 
 ---
 
