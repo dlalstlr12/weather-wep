@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
+import com.example.weather.chat.AnthropicProperties;
 import com.example.weather.service.KmaProperties;
 
 import java.io.BufferedReader;
@@ -15,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @SpringBootApplication
-@EnableConfigurationProperties(KmaProperties.class)
+@EnableConfigurationProperties({KmaProperties.class, AnthropicProperties.class})
 public class WeatherApplication {
     public static void main(String[] args) {
         // Load .env from working directory if present (only sets missing system properties)
