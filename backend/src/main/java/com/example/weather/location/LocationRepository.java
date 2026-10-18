@@ -28,12 +28,31 @@ public class LocationRepository {
 
     /** 이름 일부로 검색. 상위 행정구역(시·도, 시·군·구)을 먼저, 같은 단계에서는 이름이 짧은 것을 먼저 돌려준다. */
     public List<Place> search(String query, int limit) {
-        // LIKE 패턴의 특수문자(% _)와 이스케이프 문자(!)는 일반 문자로 취급한다
-        String pattern = "%" + query.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
-        return jdbc.sql("SELECT " + COLUMNS + ", NULL::float8 AS distance_m FROM locations "
-                        + "WHERE full_name ILIKE :pattern ESCAPE '!' ORDER BY (sigungu IS NOT NULL)::int + (eupmyeondong IS NOT NULL)::int, length(full_name), id LIMIT :limit")
-                .param("pattern", pattern).param("limit", limit)
-                .query(MAPPER).list();
+        List<Place> found = searchByName(query, limit);
+        String q = query.trim();
+        // "제주도", "서울시"처럼 정식 이름에 없는 접미사(도, 시)가 붙은 입력은 접미사를 떼고 한 번 더 찾는다
+        if (found.isEmpty() && q.length() > 2 && (q.endsWith("도") || q.endsWith("시"))) {
+            return searchByName(q.substring(0, q.length() - 1), limit);
+        }
+        return found;
+    }
+
+    private List<Place> searchByName(String query, int limit) {
+        // 공백으로 나눈 단어가 모두 이름에 들어 있어야 한다 ("부산 해운대구"가 "부산광역시 해운대구"를 찾도록)
+        String[] words = query.trim().split("\\s+");
+        StringBuilder where = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) where.append(" AND ");
+            where.append("full_name ILIKE :p").append(i).append(" ESCAPE '!'");
+        }
+        JdbcClient.StatementSpec spec = jdbc.sql("SELECT " + COLUMNS + ", NULL::float8 AS distance_m FROM locations WHERE " + where
+                + " ORDER BY (sigungu IS NOT NULL)::int + (eupmyeondong IS NOT NULL)::int, length(full_name), id LIMIT :limit")
+                .param("limit", limit);
+        for (int i = 0; i < words.length; i++) {
+            // LIKE 패턴의 특수문자(% _)와 이스케이프 문자(!)는 일반 문자로 취급한다
+            spec = spec.param("p" + i, "%" + words[i].replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%");
+        }
+        return spec.query(MAPPER).list();
     }
 
     public Optional<Place> findBestMatch(String name) {

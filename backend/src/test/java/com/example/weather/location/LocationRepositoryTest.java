@@ -29,6 +29,7 @@ class LocationRepositoryTest extends PostgisIntegrationTest {
         insert("서울특별시 강남구 역삼1동", "서울특별시", "강남구", "역삼1동", 61, 126, 37.5000, 127.0360);
         insert("서울특별시 강남구 역삼2동", "서울특별시", "강남구", "역삼2동", 61, 126, 37.4950, 127.0450);
         insert("부산광역시", "부산광역시", null, null, 98, 76, 35.1796, 129.0756);
+        insert("부산광역시 해운대구", "부산광역시", "해운대구", null, 99, 75, 35.1631, 129.1639);
         insert("광주광역시", "광주광역시", null, null, 58, 74, 35.1595, 126.8526);
         insert("경기도 광주시", "경기도", "광주시", null, 69, 66, 37.4294, 127.2550);
         insert("제주특별자치도", "제주특별자치도", null, null, 52, 38, 33.4996, 126.5312);
@@ -38,6 +39,21 @@ class LocationRepositoryTest extends PostgisIntegrationTest {
         jdbc.update("insert into locations (sido, sigungu, eupmyeondong, full_name, nx, ny, geom) "
                         + "values (?, ?, ?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography)",
                 sido, sigungu, dong, full, nx, ny, lon, lat);
+    }
+
+    @Test
+    void searchRequiresEveryWordAndIgnoresTheirOrder() {
+        assertEquals("부산광역시 해운대구", repo.search("부산 해운대구", 5).get(0).fullName());
+        assertEquals("부산광역시 해운대구", repo.search("해운대구 부산", 5).get(0).fullName());
+        assertTrue(repo.search("서울 해운대구", 5).isEmpty());
+    }
+
+    @Test
+    void searchRetriesWithoutTrailingDoOrSiWhenNothingMatches() {
+        assertEquals("제주특별자치도", repo.search("제주도", 5).get(0).fullName());
+        assertEquals("서울특별시", repo.search("서울시", 5).get(0).fullName());
+        assertEquals("경기도 광주시", repo.search("경기도 광주시", 5).get(0).fullName()); // 그대로 맞으면 접미사를 떼지 않는다
+        assertTrue(repo.search("가나다라도", 5).isEmpty());
     }
 
     @Test
