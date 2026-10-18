@@ -10,7 +10,8 @@
 | [phase3-postgis.md](phase3-postgis.md) | Phase 3 PostgreSQL + PostGIS | 행정구역 3,836곳, 공간 인덱스 21.7~131.7배, 배포 전환 절차, 데이터 설명 |
 | [phase4-llm-chat.md](phase4-llm-chat.md) | Phase 4 도구 호출 챗 | Claude Haiku 5.5 도구 3개, 비용 상한, 규칙 기반 폴백, 실호출 7건 확인 |
 | [phase5-eval.md](phase5-eval.md) | Phase 5 챗 평가 | 50문항, 코드 채점, 시험셋 평균 84.4%, 평가가 찾은 문제와 채점 기준을 고친 이력 |
-| [phase6-observability.md](phase6-observability.md) | Phase 6 관측성·CI·커버리지 | 측정값 11종, Prometheus+Grafana, 장애 주입 검증, JaCoCo 90.0%, GitHub Actions |
+| [phase6-observability.md](phase6-observability.md) | Phase 6 관측성·CI·커버리지 | 측정값 11종, Prometheus+Grafana, 장애 주입 검증, JaCoCo 줄 90.0%(Phase 6 시점), GitHub Actions |
+| [phase7-chat-streaming.md](phase7-chat-streaming.md) | Phase 7 챗 스트리밍과 문서 정리 | 진짜 SSE(상태 표시 + 답변 조각), 스트림마다 나던 보안 예외 로그 수정, 테스트 188개 |
 | [troubleshooting.md](troubleshooting.md) | 겪은 문제와 해결 모음 | 측정 방법의 실수, 서비스 결함, 챗 문제, 프론트 문제 |
 
 ## 문서 밖의 근거 자료

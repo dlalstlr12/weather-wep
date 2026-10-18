@@ -3,6 +3,8 @@ package com.example.weather.service;
 import com.example.weather.chat.AnthropicClient;
 import com.example.weather.chat.AnthropicProperties;
 import com.example.weather.chat.ChatQuota;
+import com.example.weather.chat.ChatSink;
+import com.example.weather.chat.StreamClosedException;
 import com.example.weather.chat.LlmCallLimitException;
 import com.example.weather.chat.LlmException;
 import com.example.weather.chat.WeatherTools;
@@ -85,8 +87,54 @@ public class ChatService {
         this.clock = clock;
     }
 
-    /** 규칙 기반으로 내려간 이유를 측정하려고 chat.requests에 path(llm|fallback)와 reason을 남긴다. */
     public ChatDtos.ChatResponse chat(ChatDtos.ChatRequest req, String user) {
+        return new ChatDtos.ChatResponse(answer(req, user, null));
+    }
+
+    /**
+     * 답변을 조각으로 흘려 보낸다 (도구를 쓰는 동안은 status, 답변은 delta). LLM을 못 쓰면 규칙 기반 답변 전체를 한 번에 보낸다.
+     * 받는 쪽 연결이 끊기면 모델 호출을 멈춘다.
+     */
+    public void chatStream(ChatDtos.ChatRequest req, String user, ChatSink sink) {
+        answer(req, user, new Tracking(sink));
+    }
+
+    /** sink가 있으면 보낸 답변 조각이 있는지 기억해서, 필요할 때만 reset을 보낸다. */
+    private static final class Tracking {
+        private final ChatSink sink;
+        private boolean streamed;
+
+        Tracking(ChatSink sink) {
+            this.sink = sink;
+        }
+
+        void delta(String text) {
+            streamed = true;
+            sink.delta(text);
+        }
+
+        void status(String text) {
+            sink.status(text);
+        }
+
+        void reset() {
+            if (!streamed) return;
+            streamed = false;
+            sink.reset();
+        }
+    }
+
+    private static String statusText(String tool) {
+        return switch (tool) {
+            case "search_location" -> "지역을 찾는 중이에요";
+            case "get_current_weather" -> "현재 날씨를 조회하는 중이에요";
+            case "get_forecast" -> "예보를 조회하는 중이에요";
+            default -> "조회하는 중이에요";
+        };
+    }
+
+    /** 규칙 기반으로 내려간 이유를 측정하려고 chat.requests에 path(llm|fallback)와 reason을 남긴다. */
+    private String answer(ChatDtos.ChatRequest req, String user, Tracking sink) {
         String reason;
         if (!llm.enabled()) {
             reason = "disabled";
@@ -95,13 +143,18 @@ public class ChatService {
         } else {
             Timer.Sample sample = Timer.start(registry);
             try {
-                String answer = askModel(req, user);
+                String answer = askModel(req, user, sink);
                 if (answer != null && !answer.isBlank()) {
                     stopTimer(sample, "ok");
                     requestCounter("llm", "ok").increment();
-                    return new ChatDtos.ChatResponse(answer);
+                    return answer;
                 }
                 reason = "empty";
+            } catch (StreamClosedException e) {
+                stopTimer(sample, "cancelled");
+                requestCounter("llm", "cancelled").increment();
+                log.info("챗 스트림 연결이 끊겨 모델 호출을 중단했습니다");
+                return "";
             } catch (LlmCallLimitException e) {
                 reason = "call_limit";
                 log.warn("LLM 호출 횟수 초과, 규칙 기반 답변으로 대체합니다");
@@ -112,7 +165,12 @@ public class ChatService {
             stopTimer(sample, reason);
         }
         requestCounter("fallback", reason).increment();
-        return fallback(req);
+        String text = fallback(req).content();
+        if (sink != null) {
+            sink.reset(); // 모델이 도중에 실패했다면 이미 보낸 조각을 지우고 규칙 기반 답변으로 바꾼다
+            sink.delta(text);
+        }
+        return text;
     }
 
     private Counter requestCounter(String path, String reason) {
@@ -140,6 +198,7 @@ public class ChatService {
     /** 처음 생긴 카운터는 Prometheus의 increase()가 첫 증가를 세지 못하므로(그래서 비율 패널이 틀려진다) 0으로 미리 등록한다. */
     private void registerCounters() {
         requestCounter("llm", "ok");
+        requestCounter("llm", "cancelled");
         for (String r : new String[] {"disabled", "quota", "error", "call_limit", "empty"}) requestCounter("fallback", r);
         tokenCounter("input");
         tokenCounter("output");
@@ -153,7 +212,7 @@ public class ChatService {
 
     // ---- LLM 경로 ----
 
-    private String askModel(ChatDtos.ChatRequest req, String user) {
+    private String askModel(ChatDtos.ChatRequest req, String user, Tracking sink) {
         ArrayNode messages = history(req);
         if (messages.isEmpty() || !"user".equals(messages.get(messages.size() - 1).path("role").asText())) {
             throw new LlmException("마지막 메시지가 사용자 메시지가 아닙니다");
@@ -167,7 +226,20 @@ public class ChatService {
         int outputTokens = 0;
         List<String> used = new ArrayList<>();
         for (int call = 1; call <= props.maxModelCalls(); call++) {
-            JsonNode res = llm.create(system, tools.definitions(), messages);
+            JsonNode res = sink == null
+                    ? llm.create(system, tools.definitions(), messages)
+                    : llm.stream(system, tools.definitions(), messages, new AnthropicClient.StreamHandler() {
+                        @Override
+                        public void onText(String text) {
+                            sink.delta(text);
+                        }
+
+                        @Override
+                        public void onToolStart(String name) {
+                            sink.reset(); // 도구를 쓰기 전에 흘러나온 문장은 지운다
+                            sink.status(statusText(name));
+                        }
+                    });
             int in = res.path("usage").path("input_tokens").asInt();
             int out = res.path("usage").path("output_tokens").asInt();
             inputTokens += in;

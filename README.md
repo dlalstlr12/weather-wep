@@ -17,10 +17,10 @@
 |---|---|---|---|
 | 외부 API 장애 대응 | 기상청 장애가 403 빈 본문으로 나감. 응답이 5초 늦으면 요청 스레드 50개가 모두 대기해 날씨와 무관한 요청도 중앙값 4.5초. 장애 중에도 요청마다 기상청 호출 | 타임아웃, 재시도, 서킷 브레이커, 캐시(같은 키 동시 요청 합치기, 실패 시 지난 값 응답). 무관한 요청 중앙값 2ms, 500 장애 시 기상청 호출 20회(요청 701~1,987건), 같은 키 동시 50요청이 기상청 호출 1회로 | [기준선](docs/baseline.md), [Phase 2](docs/phase2-resilience.md) |
 | 위치 검색 | 도시 11곳 하드코딩 | PostGIS, 기상청 행정구역 3,836곳과 공식 격자. 공간 인덱스로 반경 5km 검색 5.31ms → 0.245ms(서울), 6.06ms → 0.046ms(인제) | [Phase 3](docs/phase3-postgis.md) |
-| 챗 | 키워드로 의도를 읽고 로컬 소형 모델에 프롬프트, 가짜 스트리밍 | Claude Haiku 5.5 도구 호출(위치 검색·현재·예보), 멀티턴, 호출 횟수·토큰·일일 사용량 상한, LLM을 못 쓰면 규칙 기반 답변으로 대체. 질문당 약 $0.0003 | [Phase 4](docs/phase4-llm-chat.md) |
+| 챗 | 키워드로 의도를 읽고 로컬 소형 모델에 프롬프트, 완성된 답을 잘라 보내는 가짜 스트리밍 | Claude Haiku 5.5 도구 호출(위치 검색·현재·예보), 멀티턴, 호출 횟수·토큰·일일 사용량 상한, LLM을 못 쓰면 규칙 기반 답변으로 대체. 질문당 약 $0.0003. 진짜 SSE 스트리밍(도구 조회 상태 표시 + 답변 조각) | [Phase 4](docs/phase4-llm-chat.md), [Phase 7](docs/phase7-chat-streaming.md) |
 | 챗 평가 | 없음 | 50문항 평가셋(훈련 35 / 시험 15)과 코드 채점기. 처음 보는 15문항 평균 84.4%(3회), 개선 후 전체 50문항 평균 98.7%(시험셋은 개선 뒤 미공개가 아님). 평가가 모델이 날짜를 지어내는 문제를 찾아냄 | [Phase 5](docs/phase5-eval.md) |
 | 관측 | 없음 | Micrometer 측정값 11종, Prometheus + Grafana 대시보드 16패널. 장애 주입 시나리오로 측정값이 실제 동작과 일치함을 확인 | [Phase 6](docs/phase6-observability.md) |
-| 테스트·CI | 테스트 0개 | 테스트 175개, JaCoCo 줄 커버리지 90.0%(분기 71.7%, 하한선 87%), GitHub Actions | [Phase 6](docs/phase6-observability.md) |
+| 테스트·CI | 테스트 0개 | 테스트 188개, JaCoCo 줄 커버리지 91.1%(분기 73.1%, 하한선 87%), GitHub Actions | [Phase 6](docs/phase6-observability.md), [Phase 7](docs/phase7-chat-streaming.md) |
 
 작업 중 겪은 문제와 해결은 [docs/troubleshooting.md](docs/troubleshooting.md)에 모았습니다. 전체 문서 목록은 [docs/README.md](docs/README.md)입니다.
 
@@ -73,7 +73,7 @@ flowchart TD
 - 기상청 장애 시 지난 값을 "N분 전 데이터"로 안내
 - 즐겨찾기 도시와 지도 마커
 - 회원가입, 로그인(JWT), 로그인한 사용자만 쓰는 날씨 챗
-- 챗: 지명 검색, 현재 날씨, 예보를 도구로 조회하며 멀티턴 대화
+- 챗: 지명 검색, 현재 날씨, 예보를 도구로 조회하며 멀티턴 대화. 도구를 조회하는 동안 상태를 보여 주고 답변을 조각으로 받아 그린다
 
 ## 모노레포 구조
 ```
@@ -105,7 +105,7 @@ docker compose up --build
 
 ## 2) 테스트
 ```bash
-cd backend && mvn verify                  # 테스트 175개 + 커버리지 하한선 검사 (Docker 필요: Testcontainers)
+cd backend && mvn verify                  # 테스트 188개 + 커버리지 하한선 검사 (Docker 필요: Testcontainers)
 cd frontend && npm ci && npm run build    # 타입 검사 + 빌드
 ```
 - 챗 평가(실제 Anthropic API를 호출해 과금됨, 기본 테스트에서 제외): `cd backend && mvn test -Dtest=ChatEvalTest -Dtest.excludedGroups=none` (방법은 [docs/phase5-eval.md](docs/phase5-eval.md))
@@ -180,7 +180,7 @@ Base URL: `https://weather-wep.onrender.com` (로컬 `http://localhost:8080`). �
 | GET | `/api/locations/search` | 없음 | `?q=역삼&limit=10` 이름 일부로 지역 검색 |
 | GET | `/api/locations/nearby` | 없음 | `?lat=&lon=&radiusKm=10&limit=10` 반경 안 지역을 가까운 순으로 |
 | POST | `/api/chat` | JWT | `{ messages: [{ role, content }], lat?, lon?, city? }` → `{ content }` |
-| POST | `/api/chat/stream` | JWT | 같은 요청을 SSE로 (현재는 완성된 답을 나눠 보내는 방식, 아래 한계 참고) |
+| POST | `/api/chat/stream` | JWT | 같은 요청을 SSE로. 이벤트 `status`(도구 조회 중), `delta`(답변 조각), `reset`, `done`, `error` (데이터는 JSON) |
 
 ---
 
@@ -192,7 +192,7 @@ Base URL: `https://weather-wep.onrender.com` (로컬 `http://localhost:8080`). �
 # 한계
 - 모든 성능·평가 수치는 로컬 한 대에서 기상청 대역으로 잰 값이고, 운영 환경(Render 무료 티어, 실제 기상청)의 값이 아닙니다. 실제 기상청은 배포 후 확인에서 캐시 없는 호출이 캐시된 호출보다 약 1.2~1.3초 더 걸렸고(각 8회 관측, 한 번의 확인), 읽기 타임아웃(2초)과 가깝습니다.
 - 운영에는 Prometheus가 없어 운영 측정값은 볼 수 없고, 알림도 없습니다.
-- `/api/chat/stream`은 진짜 토큰 스트리밍이 아닙니다. 완성된 답을 나눠 보냅니다 (응답이 1~3초라 체감 영향은 작음).
+- 스트리밍은 답변이 1~2문장이라 글자 흐름의 이득은 작고(첫 글자 이후 전체까지 0.3~0.5초), 체감 개선은 주로 "조회 중" 상태 표시입니다. 운영(Render, Cloudflare)에서 조각으로 도착하는지는 확인하지 못했습니다.
 - 챗 평가는 50문항(시험 15문항)이라 표본이 작고, 모호한 지명("서구" 등)에서 되묻지 않는 경우가 남아 있습니다.
 - 서킷 브레이커와 캐시는 서버 메모리라 인스턴스가 늘면 인스턴스마다 따로입니다. 챗의 일일 사용 한도도 메모리에만 있어 재시작하면 초기화됩니다.
 - 위치 검색은 부분 일치라 동명 지역(예: 중구 5곳)을 구분하지 못합니다.
