@@ -10,6 +10,8 @@
 - 백엔드 API: https://weather-wep.onrender.com (무료 티어라 한동안 요청이 없으면 첫 응답이 느립니다)
 - 프로젝트 노션: https://aback-may-a76.notion.site/
 
+> **처음 접속할 때 주의**: 백엔드는 무료 호스팅(Render)이라 한동안 접속이 없으면 서버가 잠들고, 첫 접속 때는 다시 켜지는 데 시간이 걸립니다. 그 사이에는 로그인과 챗이 실패할 수 있어서 **화면 위쪽에 서버 상태 안내**가 뜹니다 ("서버를 깨우는 중이에요" → "서버가 준비됐어요"). 안내가 "준비됐어요"로 바뀐 뒤에 시도해 주세요. 서버 오류가 아니라 깨어나는 중입니다.
+
 ## 이 프로젝트에서 다룬 것
 아래 수치는 모두 **로컬 PC 한 대에서 잰 값**이고, 기상청은 WireMock 대역, 평가의 날씨는 가짜 데이터입니다. 운영 환경에서 잰 값이 아닙니다. 조건과 한계는 각 문서에 있습니다.
 
@@ -20,7 +22,7 @@
 | 챗 | 키워드로 의도를 읽고 로컬 소형 모델에 프롬프트, 완성된 답을 잘라 보내는 가짜 스트리밍 | Claude Haiku 5.5 도구 호출(위치 검색·현재·예보), 멀티턴, 호출 횟수·토큰·일일 사용량 상한, LLM을 못 쓰면 규칙 기반 답변으로 대체. 질문당 약 $0.0003. 진짜 SSE 스트리밍(도구 조회 상태 표시 + 답변 조각) | [Phase 4](docs/phase4-llm-chat.md), [Phase 7](docs/phase7-chat-streaming.md) |
 | 챗 평가 | 없음 | 50문항 평가셋(훈련 35 / 시험 15)과 코드 채점기. 처음 보는 15문항 평균 84.4%(3회), 개선 후 전체 50문항 평균 98.7%(시험셋은 개선 뒤 미공개가 아님). 평가가 모델이 날짜를 지어내는 문제를 찾아냄 | [Phase 5](docs/phase5-eval.md) |
 | 관측 | 없음 | Micrometer 측정값 11종, Prometheus + Grafana 대시보드 16패널. 장애 주입 시나리오로 측정값이 실제 동작과 일치함을 확인 | [Phase 6](docs/phase6-observability.md) |
-| 테스트·CI | 테스트 0개 | 테스트 188개, JaCoCo 줄 커버리지 91.1%(분기 73.1%, 하한선 87%), GitHub Actions | [Phase 6](docs/phase6-observability.md), [Phase 7](docs/phase7-chat-streaming.md) |
+| 테스트·CI | 테스트 0개 | 테스트 192개, JaCoCo 줄 커버리지 91.0%(분기 73.1%, 하한선 87%), GitHub Actions | [Phase 6](docs/phase6-observability.md), [Phase 7](docs/phase7-chat-streaming.md) |
 
 작업 중 겪은 문제와 해결은 [docs/troubleshooting.md](docs/troubleshooting.md)에 모았습니다. 전체 문서 목록은 [docs/README.md](docs/README.md)입니다.
 
@@ -71,6 +73,7 @@ flowchart TD
 ## 핵심 기능
 - 현재 위치, 지도 클릭, 도시·지역 검색, 장소 검색(입력하면 검색창 아래에 결과 목록)으로 현재 날씨와 3시간 간격 예보 조회
 - 기상청 장애 시 지난 값을 "N분 전 데이터"로 안내
+- 서버가 잠들어 있거나 DB에 연결되지 않았을 때 화면 위에 상태 안내(깨우는 중, 경과 시간, 준비되면 자동 전환)와 연결 문제를 구분한 오류 문구
 - 즐겨찾기 도시와 지도 마커
 - 회원가입, 로그인(JWT), 로그인한 사용자만 쓰는 날씨 챗
 - 챗: 지명 검색, 현재 날씨, 예보를 도구로 조회하며 멀티턴 대화. 도구를 조회하는 동안 상태를 보여 주고 답변을 조각으로 받아 그린다
@@ -105,7 +108,7 @@ docker compose up --build
 
 ## 2) 테스트
 ```bash
-cd backend && mvn verify                  # 테스트 188개 + 커버리지 하한선 검사 (Docker 필요: Testcontainers)
+cd backend && mvn verify                  # 테스트 192개 + 커버리지 하한선 검사 (Docker 필요: Testcontainers)
 cd frontend && npm ci && npm run build    # 타입 검사 + 빌드
 ```
 - 챗 평가(실제 Anthropic API를 호출해 과금됨, 기본 테스트에서 제외): `cd backend && mvn test -Dtest=ChatEvalTest -Dtest.excludedGroups=none` (방법은 [docs/phase5-eval.md](docs/phase5-eval.md))
@@ -136,7 +139,7 @@ cd frontend && npm ci && npm run build    # 타입 검사 + 빌드
 ---
 
 # 보안
-- Spring Security + JWT. 공개: `/`, `OPTIONS /**`, `GET /api/weather/**`, `GET /api/locations/**`, `/api/auth/**`. 그 외 모든 API(특히 `/api/chat/**`)는 로그인이 필요합니다 (통합 테스트로 확인).
+- Spring Security + JWT. 공개: `/`, `OPTIONS /**`, `GET /api/weather/**`, `GET /api/locations/**`, `GET /api/health`, `/api/auth/**`. 그 외 모든 API(특히 `/api/chat/**`)는 로그인이 필요합니다 (통합 테스트로 확인).
 - 시크릿(DB 비밀번호, JWT, API 키)은 코드에 기본값이 없고 환경변수로만 받습니다. `.env`는 저장소에 올리지 않습니다.
 - 오류 메시지와 로그에는 기상청 서비스 키가 든 URL을 남기지 않습니다.
 - 챗은 사용자별·전체 일일 사용 횟수, 입력 길이, 응답 토큰에 상한이 있습니다 (비용 보호).
@@ -178,6 +181,7 @@ Base URL: `https://weather-wep.onrender.com` (로컬 `http://localhost:8080`). �
 | GET | `/api/weather/current` | 없음 | `?lat=&lon=` 또는 `?city=` (`nocache=true`로 캐시 우회) → `{ temperature, precipitation, sky, stale, ageSeconds }` |
 | GET | `/api/weather/forecast` | 없음 | 같은 파라미터 → `{ items: [...], stale, ageSeconds }` |
 | GET | `/api/locations/search` | 없음 | `?q=역삼&limit=10` 이름 일부로 지역 검색 |
+| GET | `/api/health` | 없음 | 서버 상태 확인(DB 연결까지, 3초 제한). 200 `{ status: "UP" }` / 503 `{ status: "DOWN", reason: "database" }`. 프론트의 서버 상태 안내가 사용 |
 | GET | `/api/locations/nearby` | 없음 | `?lat=&lon=&radiusKm=10&limit=10` 반경 안 지역을 가까운 순으로 |
 | POST | `/api/chat` | JWT | `{ messages: [{ role, content }], lat?, lon?, city? }` → `{ content }` |
 | POST | `/api/chat/stream` | JWT | 같은 요청을 SSE로. 이벤트 `status`(도구 조회 중), `delta`(답변 조각), `reset`, `done`, `error` (데이터는 JSON) |

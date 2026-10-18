@@ -53,7 +53,7 @@
 
 ## 5. 문서 정리
 - README를 재구성했다: 전후 수치 표(측정 환경 명시), 아키텍처·조회 경로·챗 경로 다이어그램, 설계 결정, 실행·테스트·배포 방법, 환경 변수 표, 보안, 실제 스키마에 맞춘 ERD, API 표, 한계. 이전 README에는 코드에 없는 `REFRESH_TOKEN`, `WEATHER_CACHE` 테이블과 "KMA 연동 설계" 같은 낡은 내용이 있었다.
-- `docs/README.md`(문서 목록), `docs/troubleshooting.md`(겪은 문제와 해결 22건)를 추가했다.
+- `docs/README.md`(문서 목록), `docs/troubleshooting.md`(겪은 문제와 해결)를 추가했다.
 
 ## 한계
 - **운영 환경(Render, Cloudflare Pages)에서 스트리밍이 조각으로 도착하는지는 확인하지 못했다.** 중간 프록시가 응답을 모아 한꺼번에 보낼 수 있다. 서버는 압축 대상에서 `text/event-stream`을 제외해 두었다. 배포 후 챗 화면에서 상태 문구와 글자 흐름이 보이는지 확인해야 한다.

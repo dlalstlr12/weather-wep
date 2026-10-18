@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
+import { errorText, isUnreachable } from '../api/errors'
+import { useServerStatus } from '../components/ServerStatus'
 import { setAccessToken } from '../auth'
 import { useNavigate, Link } from 'react-router-dom'
 import BrandBar from '../components/BrandBar'
@@ -12,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const { recheck } = useServerStatus()
 
   useEffect(() => {
     const msg = consumeFlash()
@@ -36,7 +39,9 @@ export default function LoginPage() {
         setError('로그인 실패')
       }
     } catch (e) {
-      setError('로그인 실패')
+      // 서버에 닿지 못했으면 상태를 다시 확인해 위쪽 안내가 보이게 하고, 서버가 보낸 메시지(예: 비밀번호 불일치)는 그대로 보여 준다
+      if (isUnreachable(e)) recheck()
+      setError(errorText(e, '로그인에 실패했어요.'))
     } finally {
       setLoading(false)
     }

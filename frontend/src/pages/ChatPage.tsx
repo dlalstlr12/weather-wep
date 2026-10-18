@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BrandBar from '../components/BrandBar'
 import Markdown from '../components/Markdown'
+import { UNREACHABLE_MESSAGE, isUnreachable } from '../api/errors'
+import { useServerStatus } from '../components/ServerStatus'
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; at: number }
 type Coords = { lat: number; lon: number }
@@ -34,6 +36,7 @@ export default function ChatPage() {
 
   const [, setTyping] = useState(false)
   const [status, setStatus] = useState('')
+  const { recheck } = useServerStatus()
   const [ctrl, setCtrl] = useState<AbortController | null>(null)
 
   const send = async () => {
@@ -75,6 +78,9 @@ export default function ChatPage() {
         body: JSON.stringify({ messages, lat: coords?.lat ?? null, lon: coords?.lon ?? null }),
         signal: controller.signal
       })
+      if (res.status === 401 || res.status === 403) throw new Error('로그인이 만료됐거나 필요해요. 다시 로그인해 주세요.')
+      // 호스팅이 돌려준 502/503/504는 서버가 깨어나는 중이다
+      if ([502, 503, 504].includes(res.status)) throw new TypeError('server unreachable')
       if (!res.ok || !res.body) throw new Error('스트리밍 시작 실패')
 
       const reader = res.body.getReader()
@@ -119,7 +125,14 @@ export default function ChatPage() {
         setContent((prev) => prev || '(응답을 취소했어요)')
         return
       }
-      setContent(() => '죄송해요, 응답 중 오류가 발생했어요.')
+      if (isUnreachable(e)) {
+        recheck()
+        setContent(() => UNREACHABLE_MESSAGE)
+      } else if (e instanceof Error && e.message.startsWith('로그인')) {
+        setContent(() => e.message)
+      } else {
+        setContent(() => '죄송해요, 응답 중 오류가 발생했어요.')
+      }
     } finally {
       setStatus('')
       setCtrl(null)

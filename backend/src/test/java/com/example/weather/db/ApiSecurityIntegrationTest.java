@@ -104,6 +104,11 @@ class ApiSecurityIntegrationTest extends PostgisIntegrationTest {
     }
 
     @Test
+    void healthIsPublicAndReportsDatabaseUp() throws Exception {
+        mvc.perform(get("/api/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void weatherIsPublic() throws Exception {
         when(weather.getCurrent(any(), any(), any(), anyBoolean())).thenReturn(new WeatherDtos.CurrentWeatherResponse(1.5, 0.0, "흐림"));
         mvc.perform(get("/api/weather/current").param("city", "서울"))
