@@ -14,7 +14,7 @@ public record AnthropicProperties(
         @DefaultValue("2000") int connectTimeoutMs,
         @DefaultValue("20000") int readTimeoutMs,
         /** 한 질문에 모델을 부르는 최대 횟수 (도구 호출 왕복 포함). 넘으면 규칙 기반 답변으로 대체 */
-        @DefaultValue("3") int maxModelCalls,
+        @DefaultValue("4") int maxModelCalls,
         /** 이전 대화는 최근 몇 개 메시지만 보낸다 */
         @DefaultValue("6") int maxHistory,
         /** 메시지 하나의 최대 글자 수. 넘으면 잘라서 보낸다 */

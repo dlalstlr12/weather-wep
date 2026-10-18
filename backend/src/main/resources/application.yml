@@ -54,7 +54,7 @@ anthropic:
   model: claude-haiku-5-5
   # 비용 상한: 응답 최대 토큰, 질문당 모델 호출 횟수, 보내는 대화 길이, 하루 사용 횟수
   max-tokens: 400
-  max-model-calls: 3
+  max-model-calls: 4
   max-history: 6
   max-message-chars: 500
   daily-limit-per-user: 10
