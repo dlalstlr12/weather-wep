@@ -5,6 +5,7 @@ import com.example.weather.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -19,16 +20,17 @@ public class ChatController {
     private final ChatService chatService;
 
     @PostMapping
-    public ResponseEntity<ChatDtos.ChatResponse> chat(@Valid @RequestBody ChatDtos.ChatRequest req) {
-        return ResponseEntity.ok(chatService.chat(req));
+    public ResponseEntity<ChatDtos.ChatResponse> chat(@Valid @RequestBody ChatDtos.ChatRequest req, Authentication auth) {
+        return ResponseEntity.ok(chatService.chat(req, auth.getName()));
     }
 
     @PostMapping(value = "/stream", produces = "text/event-stream")
-    public SseEmitter stream(@Valid @RequestBody ChatDtos.ChatRequest req) {
+    public SseEmitter stream(@Valid @RequestBody ChatDtos.ChatRequest req, Authentication auth) {
+        String user = auth.getName();
         SseEmitter emitter = new SseEmitter(0L);
         CompletableFuture.runAsync(() -> {
             try {
-                String full = chatService.chat(req).content();
+                String full = chatService.chat(req, user).content();
                 if (full == null) full = "";
                 // chunk by ~80 chars
                 byte[] bytes = full.getBytes(StandardCharsets.UTF_8);

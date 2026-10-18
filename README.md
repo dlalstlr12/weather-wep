@@ -61,7 +61,7 @@ root
      - `SPRING_DATASOURCE_USERNAME=...`
      - `SPRING_DATASOURCE_PASSWORD=...`
      - `JWT_SECRET=임의의_랜덤_시크릿`
-     - (옵션) `HF_API_TOKEN`, `KMA_SERVICE_KEY` 등
+     - (옵션) `ANTHROPIC_API_KEY`(챗 LLM, 없으면 규칙 기반 답변), `KMA_SERVICE_KEY` 등
 2. 실행: `docker compose up --build`
 3. 접속: http://localhost (프론트), http://localhost:8080 (백엔드)
 
@@ -80,7 +80,7 @@ root
 ## 백엔드
 - `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
 - `JWT_SECRET`
-- (옵션) `HF_API_TOKEN` (모델 연동 시), `KMA_SERVICE_KEY`, `PORT`(호스팅 제공자에 의해 주입)
+- (옵션) `ANTHROPIC_API_KEY` (챗 LLM, 없으면 규칙 기반 답변), `KMA_SERVICE_KEY`, `PORT`(호스팅 제공자에 의해 주입)
 
 ---
 
@@ -140,10 +140,11 @@ Base URL: `${VITE_API_BASE_URL}` (프론트) / `https://weather-wep.onrender.com
   - res: `{ items: [ { dateTime, temperature, sky, precipitation, ... }, ... ] }`
 
 ## 날씨 챗(보호)
-- POST `/api/chat/message`
+- POST `/api/chat`
   - headers: `Authorization: Bearer <token>`
-  - req: `{ message: string }`
-  - res: `{ reply: string }`
+  - req: `{ messages: [{ role: "user" | "assistant", content }], lat?, lon?, city? }` (최근 6개 메시지만 사용)
+  - res: `{ content: string }`
+  - Claude(Haiku 5.5)가 도구(`search_location`, `get_current_weather`, `get_forecast`)를 호출해 답한다. LLM을 쓸 수 없으면 규칙 기반 답변으로 대체한다. 자세한 내용은 [docs/phase4-llm-chat.md](docs/phase4-llm-chat.md).
 
 > 실제 응답 스키마는 구현에 따라 일부 차이가 있을 수 있습니다. 프론트 소스의 호출 형식을 기준으로 사용 가능합니다.
 

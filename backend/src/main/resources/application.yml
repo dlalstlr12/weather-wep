@@ -48,10 +48,17 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
 
-huggingface:
-  api-base: http://localhost:11434/v1/chat/completions
-  model: bllossom3b-q4km
-  api-token: ${HF_API_TOKEN:}
+anthropic:
+  # 비어 있으면 LLM 없이 규칙 기반 답변만 쓴다. 키는 환경변수로만 넣는다
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: claude-haiku-5-5
+  # 비용 상한: 응답 최대 토큰, 질문당 모델 호출 횟수, 보내는 대화 길이, 하루 사용 횟수
+  max-tokens: 400
+  max-model-calls: 3
+  max-history: 6
+  max-message-chars: 500
+  daily-limit-per-user: 10
+  daily-limit-total: 100
 
 kma:
   service-key: ${KMA_SERVICE_KEY:}
