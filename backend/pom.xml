@@ -17,6 +17,8 @@
   <properties>
     <java.version>17</java.version>
     <jjwt.version>0.11.5</jjwt.version>
+    <!-- 실제 LLM을 호출하는 평가(@Tag("eval"))는 기본 제외. 실행: -Dtest.excludedGroups=none -->
+    <test.excludedGroups>eval</test.excludedGroups>
   </properties>
 
   <dependencies>
@@ -128,6 +130,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <excludedGroups>${test.excludedGroups}</excludedGroups>
           <!-- 통합 테스트(@SpringBootTest)가 필수 환경변수 없이 기동하도록 테스트용 값을 준다 -->
           <environmentVariables>
             <JWT_SECRET>test-secret-test-secret-test-secret-1234567890</JWT_SECRET>
