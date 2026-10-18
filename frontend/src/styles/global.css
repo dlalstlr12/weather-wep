@@ -87,3 +87,12 @@ label { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 640px) {
   .daily-grid { grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); overflow-x: auto; padding-bottom: 4px; }
 }
+
+/* place search: 결과 목록이 검색창 바로 아래에 겹쳐서 뜬다 */
+.place-search { position: relative; }
+.place-list { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 2000; margin: 0; padding: 6px; list-style: none; max-height: 300px; overflow-y: auto; border-radius: 12px; background: rgba(255,255,255,0.98); border: 1px solid var(--glass-brd); box-shadow: 0 16px 30px rgba(2,6,23,0.25); }
+.place-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; cursor: pointer; color: #0f172a; }
+.place-item.active { background: #e0e7ff; }
+.place-name { font-weight: 700; font-size: 14px; }
+.place-addr { font-size: 12px; color: var(--muted); }
+.place-empty { padding: 10px 12px; font-size: 13px; color: var(--muted); }
