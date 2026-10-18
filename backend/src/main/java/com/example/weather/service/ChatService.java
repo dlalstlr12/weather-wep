@@ -3,6 +3,7 @@ package com.example.weather.service;
 import com.example.weather.chat.AnthropicClient;
 import com.example.weather.chat.AnthropicProperties;
 import com.example.weather.chat.ChatQuota;
+import com.example.weather.chat.LlmCallLimitException;
 import com.example.weather.chat.LlmException;
 import com.example.weather.chat.WeatherTools;
 import com.example.weather.dto.ChatDtos;
@@ -11,6 +12,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -18,6 +23,7 @@ import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -53,15 +59,23 @@ public class ChatService {
     private final WeatherService weatherService;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final MeterRegistry registry;
 
     @Autowired
     public ChatService(AnthropicClient llm, AnthropicProperties props, WeatherTools tools, ChatQuota quota,
-                       WeatherService weatherService, ObjectMapper mapper) {
-        this(llm, props, tools, quota, weatherService, mapper, Clock.system(SEOUL));
+                       WeatherService weatherService, ObjectMapper mapper, MeterRegistry registry) {
+        this(llm, props, tools, quota, weatherService, mapper, Clock.system(SEOUL), registry);
     }
 
     public ChatService(AnthropicClient llm, AnthropicProperties props, WeatherTools tools, ChatQuota quota,
-                       WeatherService weatherService, ObjectMapper mapper, Clock clock) {
+                       WeatherService weatherService, ObjectMapper mapper) {
+        this(llm, props, tools, quota, weatherService, mapper, Clock.system(SEOUL), new SimpleMeterRegistry());
+    }
+
+    public ChatService(AnthropicClient llm, AnthropicProperties props, WeatherTools tools, ChatQuota quota,
+                       WeatherService weatherService, ObjectMapper mapper, Clock clock, MeterRegistry registry) {
+        this.registry = registry;
+        registerCounters();
         this.llm = llm;
         this.props = props;
         this.tools = tools;
@@ -71,16 +85,70 @@ public class ChatService {
         this.clock = clock;
     }
 
+    /** 규칙 기반으로 내려간 이유를 측정하려고 chat.requests에 path(llm|fallback)와 reason을 남긴다. */
     public ChatDtos.ChatResponse chat(ChatDtos.ChatRequest req, String user) {
-        if (llm.enabled() && quota.tryAcquire(user)) {
+        String reason;
+        if (!llm.enabled()) {
+            reason = "disabled";
+        } else if (!quota.tryAcquire(user)) {
+            reason = "quota";
+        } else {
+            Timer.Sample sample = Timer.start(registry);
             try {
                 String answer = askModel(req, user);
-                if (answer != null && !answer.isBlank()) return new ChatDtos.ChatResponse(answer);
+                if (answer != null && !answer.isBlank()) {
+                    stopTimer(sample, "ok");
+                    requestCounter("llm", "ok").increment();
+                    return new ChatDtos.ChatResponse(answer);
+                }
+                reason = "empty";
+            } catch (LlmCallLimitException e) {
+                reason = "call_limit";
+                log.warn("LLM 호출 횟수 초과, 규칙 기반 답변으로 대체합니다");
             } catch (RuntimeException e) {
+                reason = "error";
                 log.warn("LLM 답변 실패, 규칙 기반 답변으로 대체합니다: {}", e.getMessage());
             }
+            stopTimer(sample, reason);
         }
+        requestCounter("fallback", reason).increment();
         return fallback(req);
+    }
+
+    private Counter requestCounter(String path, String reason) {
+        return Counter.builder("chat.requests").description("챗 요청 처리 경로(llm 또는 fallback)와 이유")
+                .tag("path", path).tag("reason", reason).register(registry);
+    }
+
+    private void stopTimer(Timer.Sample sample, String outcome) {
+        sample.stop(Timer.builder("chat.llm.duration").description("LLM 경로 한 질문의 전체 소요 시간(도구 호출 포함)")
+                .tag("outcome", outcome).publishPercentileHistogram().register(registry));
+    }
+
+    private Counter tokenCounter(String type) {
+        return Counter.builder("chat.llm.tokens").description("LLM 사용 토큰").tag("type", type).register(registry);
+    }
+
+    // 모델이 만든 임의의 이름이 측정값 태그로 쌓이지 않도록 아는 도구 이름만 쓴다
+    private static final Set<String> KNOWN_TOOLS = Set.of("search_location", "get_current_weather", "get_forecast");
+
+    private Counter toolCounter(String name, boolean error) {
+        return Counter.builder("chat.tool.calls").description("도구 호출 횟수").tag("tool", KNOWN_TOOLS.contains(name) ? name : "unknown")
+                .tag("error", String.valueOf(error)).register(registry);
+    }
+
+    /** 처음 생긴 카운터는 Prometheus의 increase()가 첫 증가를 세지 못하므로(그래서 비율 패널이 틀려진다) 0으로 미리 등록한다. */
+    private void registerCounters() {
+        requestCounter("llm", "ok");
+        for (String r : new String[] {"disabled", "quota", "error", "call_limit", "empty"}) requestCounter("fallback", r);
+        tokenCounter("input");
+        tokenCounter("output");
+        for (String t : KNOWN_TOOLS) {
+            toolCounter(t, false);
+            toolCounter(t, true);
+        }
+        toolCounter("unknown", false);
+        toolCounter("unknown", true);
     }
 
     // ---- LLM 경로 ----
@@ -100,8 +168,12 @@ public class ChatService {
         List<String> used = new ArrayList<>();
         for (int call = 1; call <= props.maxModelCalls(); call++) {
             JsonNode res = llm.create(system, tools.definitions(), messages);
-            inputTokens += res.path("usage").path("input_tokens").asInt();
-            outputTokens += res.path("usage").path("output_tokens").asInt();
+            int in = res.path("usage").path("input_tokens").asInt();
+            int out = res.path("usage").path("output_tokens").asInt();
+            inputTokens += in;
+            outputTokens += out;
+            tokenCounter("input").increment(in);
+            tokenCounter("output").increment(out);
             JsonNode content = res.get("content");
 
             if (!"tool_use".equals(res.path("stop_reason").asText())) {
@@ -118,6 +190,7 @@ public class ChatService {
                 String name = block.path("name").asText();
                 used.add(name);
                 WeatherTools.Result r = tools.execute(name, block.path("input"), ctx);
+                toolCounter(name, r.isError()).increment();
                 ObjectNode item = results.addObject();
                 item.put("type", "tool_result");
                 item.put("tool_use_id", block.path("id").asText());
@@ -128,7 +201,7 @@ public class ChatService {
         }
         log.warn("chat llm user={} 모델 호출 횟수 초과 calls={} tools={} inputTokens={} outputTokens={}",
                 user, props.maxModelCalls(), used, inputTokens, outputTokens);
-        throw new LlmException("모델 호출 횟수 초과");
+        throw new LlmCallLimitException("모델 호출 횟수 초과");
     }
 
     /** 최근 메시지 몇 개만, 길이를 자르고, 첫 메시지가 사용자 메시지가 되도록 다듬는다 (토큰 비용 상한). */
